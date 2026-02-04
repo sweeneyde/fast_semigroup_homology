@@ -111,6 +111,9 @@ def test_exponentially_growing_Zs():
                                 [0,1,0,1,0,0,5],
                                 [0,1,2,3,4,5,6]])
     assert res.homology_list(10) == [{0: 1}, {}, {0: 1}, {0: 2}, {0: 4}, {0: 8}, {0: 16}, {0: 32}, {0: 64}, {0: 128}, {0: 256}]
+    # The following would not be fast enough if we didn't use homology_with_shift:
+    assert res.homology_list(102)[-1] == {0: 2**100}
+    assert res.homology_list(1002)[-1] == {0: 2**1000}
     M0 = res.root
     assert M0.module == [0]
     assert M0.prev_module is None

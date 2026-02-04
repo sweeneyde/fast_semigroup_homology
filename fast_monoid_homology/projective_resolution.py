@@ -34,7 +34,6 @@ def cover_submodule_with_actions(
     result_ZS_module = [id_to_idempotent[id(vec)] for vec in generating_subset]
     return generating_subset, result_ZS_module
 
-
 class ProjectiveResolution:
     """Data representing a projective resolution of ZZ[S]-modules for some monoid S"""
     __slots__ = [
@@ -176,19 +175,35 @@ class ProjectiveResolution:
             result[0] = free_rank
             return result
 
-        @cache
-        def homology_with_shift(node, shift) -> Counter:
-            if shift == 0:
-                return homology(node)
-            else:
+        # homology_with_shift[node, dim] will store the homology dim
+        # dimensions higher in the resolution. This is calculated as
+        # a sum of homology_with_shift[child, dim] for all children.
+        # Use a stack instead of recursion so we don't blow Python's
+        # recursion limit.
+        homology_with_shift = {}
+        stack = [(self.root, dim) for dim in range(maxdim + 1)]
+        while stack:
+            node, dim = stack[-1]
+            if (node, dim) in homology_with_shift:
+                stack.pop()
+                continue
+            if dim == 0:
+                homology_with_shift[node, 0] = homology(node)
+                stack.pop()
+                continue
+            children_done = True
+            for child in node.get_children():
+                if (child, dim-1) not in homology_with_shift:
+                    stack.append((child, dim-1))
+                    children_done = False
+            if children_done:
                 result = Counter()
-                for child in node.get_children(verbose=verbose):
-                    result += homology_with_shift(child, shift - 1)
-                return result
-
-        return [invariant_factors(homology_with_shift(self.root, dim))
+                for child in node.get_children():
+                    result += homology_with_shift[child, dim-1]
+                homology_with_shift[node, dim] = result
+                stack.pop()
+        return [invariant_factors(homology_with_shift[self.root, dim])
                 for dim in range(maxdim + 1)]
-
 
 class ResolutionNode:
     """
@@ -316,5 +331,4 @@ class ResolutionNode:
             return tensored_image
         tensored_image = make_tensored_image()
         return tensored_image.nonzero_invariants()
-
 

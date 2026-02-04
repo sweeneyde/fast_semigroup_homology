@@ -1,8 +1,6 @@
 from collections import Counter
 from functools import cache
-from .cover_submodule import (
-    cover_submodule_with_actions,
-)
+from .find_generating_subset import find_generating_subset
 from .kernels import (
     mutable_lattice_kernel,
     mutable_lattice_kernel_with_reshuffling,
@@ -11,6 +9,31 @@ from .kernels import (
 )
 from .normalized_invariants import invariant_factors
 from mutable_lattice import Vector, Lattice
+
+def cover_submodule_with_actions(
+    Zbasis: list[Vector],
+    actions: list[Vector],
+    e_to_Se: dict[int,tuple[int,...]],
+    *,
+    extra_greedy=False,
+    ensure_minimal=False,
+    verbose=False,
+):
+    def find_fixer_idempotent(vec):
+        for e in e_to_Se:
+            if vec.shuffled_by_action(actions[e]) == vec:
+                return e
+        raise AssertionError("Not a monoid?")
+    id_to_idempotent = {id(vec): find_fixer_idempotent(vec) for vec in Zbasis}
+    costs = [len(e_to_Se[id_to_idempotent[id(vec)]]) for vec in Zbasis]
+    generating_subset = find_generating_subset(
+        Zbasis, actions, costs,
+        extra_greedy=extra_greedy,
+        ensure_minimal=ensure_minimal,
+        verbose=verbose)
+    result_ZS_module = [id_to_idempotent[id(vec)] for vec in generating_subset]
+    return generating_subset, result_ZS_module
+
 
 class ProjectiveResolution:
     """Data representing a projective resolution of ZZ[S]-modules for some monoid S"""
@@ -168,11 +191,14 @@ class ProjectiveResolution:
 
 
 class ResolutionNode:
+    """
+    Represent a ZS-linear map ZSf1(+)...(+)ZSfn <---- ZSe1(+)...(+)ZSem
+    """
     __slots__ = [
         "resolution", # The ProjectiveResolution we belong to
-        "module", # a list of idempotents [e1, ..., en]: this node represents ZSe1 (+) ... (+) ZSen
+        "module", # a list of idempotents [e1, ..., em]: this node represents ZSe1 (+) ... (+) ZSe,
         "prev_module", # The idempotents for the node one dimension lower; the target of the outgoing map
-        "e_images",
+        "e_images", # A Vector representing the image of each ei in prev_module
         "children", # A list of nodes one dimension higher used to cover the kernel of the outgoing map
     ]
     def __init__(self, resolution: ProjectiveResolution, module, prev_module, e_images):
@@ -183,23 +209,27 @@ class ResolutionNode:
         self.children = None
         assert len(e_images) == len(module)
 
-    def get_children(self, *, verbose=False, max_size_to_ensure_minimal=1000, max_size_to_cache=1000, max_size_for_extra_greedy=200):
-        if self.children is not None:
-            return self.children
-
-        e_to_Se = self.resolution.e_to_Se
+    def get_Z_basis_images(self):
+        """We only store the image of each summand generator e.
+        This retrieves the image of each se in Se, so we have the image of every Z-basis vector."""
         if self.prev_module is None:
             assert self is self.resolution.root
             S_action_on_image = self.resolution.left_S_set_action
         else:
             S_action_on_image = self.resolution.make_actions(self.prev_module)
-        # Forget the S-module structure and look at the Z-matrix
-        outgoing_matrix_columns = [
+        e_to_Se = self.resolution.e_to_Se
+        return [
             vec.shuffled_by_action(S_action_on_image[se])
             for vec, e in zip(self.e_images, self.module)
             for se in e_to_Se[e]
         ]
-        kernel_basis = self.resolution.kernel_implementation(outgoing_matrix_columns)
+
+    def get_children(self, *, verbose=False, max_size_to_cache=5000, max_size_to_ensure_minimal=200, max_size_for_extra_greedy=200):
+        if self.children is not None:
+            return self.children
+
+        Z_basis_images = self.get_Z_basis_images()
+        kernel_basis = self.resolution.kernel_implementation(Z_basis_images)
 
         # Conversion between Z-basis indexes and summand ZSe indexes
         index_to_gen_index = []
@@ -211,7 +241,7 @@ class ResolutionNode:
             gen_index_to_index_range.append(list(range(n0, n1)))
 
         # See if the kernel splits along the given summands
-        indexes, summands = Lattice(len(outgoing_matrix_columns), kernel_basis).decompose(gen_index_to_index_range)
+        indexes, summands = Lattice(len(Z_basis_images), kernel_basis).decompose(gen_index_to_index_range)
         if verbose:
             print(f"split into {len(indexes)} bins: {[len(x) for x in indexes]}")
         children = []
@@ -221,7 +251,7 @@ class ResolutionNode:
             split_e_images, split_next_module = cover_submodule_with_actions(
                 summand.get_basis(),
                 self.resolution.make_actions(summand_gens),
-                e_to_Se,
+                self.resolution.e_to_Se,
                 extra_greedy=(summand.rank <= max_size_for_extra_greedy),
                 ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
                 verbose=verbose,
@@ -250,7 +280,6 @@ class ResolutionNode:
 
         X = range(len(right_S_set_action))
         e_to_Se = self.resolution.e_to_Se
-        # e_to_s_to_ii = self.resolution.e_to_s_to_ii
 
         # Tensoring moves from a rank-N0 module sum(ZSej)
         #                   to a rank-N1 module sum(ZXej)

@@ -1,7 +1,6 @@
 from mutable_lattice import Vector, Lattice
 
 def find_generating_subset(
-    N: int,
     Zbasis: list[Vector],
     actions: list[Vector],
     costs: list[int],
@@ -15,7 +14,6 @@ def find_generating_subset(
     find a subset of the vectors such that the whole sublattice
     is spanned by the subset and its images under the actions.
 
-    N is the dimension of the ambient space.
     Zbasis is a list of Vectors of length N.
     actions is a list of Vectors of length N with entries in range(N),
         describing a collection of ways to shuffle around the
@@ -27,8 +25,17 @@ def find_generating_subset(
         is minimal with respect to inclusion.
     """
     R = len(Zbasis)
+    if R == 0:
+        return []
+    N = len(Zbasis[0])
     if verbose:
         print(f"Covering a rank-{R} sublattice of Z^{N}")
+
+    assert set(map(len, Zbasis)) == {N}
+    assert set(map(len, actions)) == {N}
+    for act in actions:
+        assert set(act) <= set(range(N))
+    assert len(costs) == R
 
     if not extra_greedy:
         def sort_by_increasing_cost():

@@ -2,7 +2,6 @@ from collections import Counter
 from functools import cache
 from .cover_submodule import (
     cover_submodule_with_actions,
-    cover_submodule,
 )
 from .kernels import (
     mutable_lattice_kernel,
@@ -20,7 +19,7 @@ class ProjectiveResolution:
         "op",
         # the integer index serving as an identity element for the monoid
         "identity",
-        # The multiplication table (S elements) x (Y elements) --> (Y elements), as tuple[tuple[int,...],...]
+        # The multiplication table (S elements) x (Y elements) --> (Y elements), as list[Vector]
         "left_S_set_action",
         # a mapping int -> tuple[int] from idempotents e to the tuple of distinct elements op[...][e]
         "e_to_Se",
@@ -37,7 +36,7 @@ class ProjectiveResolution:
     def __init__(self, op, *, left_S_set_action=None, check=True, kernel_implementation=None):
         if left_S_set_action is None:
             left_S_set_action = [[0] for _ in range(len(op))]
-        left_S_set_action = tuple(map(tuple, left_S_set_action))
+        left_S_set_action = [Vector(list(act)) for act in left_S_set_action]
         op = tuple(map(tuple, op))
         S = range(len(op))
         idempotents = [e for e in S if op[e][e] == e]
@@ -64,7 +63,7 @@ class ProjectiveResolution:
                         if act[ij][y] != act[i][jy]:
                             raise ValueError(f"act[op[{i}][{j}]][{k}]=act[{ij}][{k}]={act[ij][k]}, but "
                                              f"act[{i}][act[{j}][{k}]]=act[{i}][{jy}]={act[i][jy]}")
-            if act[identity] != tuple(Y):
+            if act[identity] != Vector(list(Y)):
                 raise ValueError(f"act[identity]=act[{identity}]={act[identity]} was not identity")
         e_Se_pairs = [(e, sorted({op[x][e] for x in S})) for e in idempotents]
         e_to_Se = dict(sorted(e_Se_pairs, key=lambda e_Se: len(e_Se[1])))
@@ -82,14 +81,34 @@ class ProjectiveResolution:
         self.kernel_implementation = kernel_implementation
 
         augmentation_module_Zbasis = Lattice.full(len(Y)).get_basis()
-        augmentation_module_actions = [Vector(list(act)) for act in left_S_set_action]
         mat0, mod0 = cover_submodule_with_actions(
-            len(Y), augmentation_module_Zbasis, augmentation_module_actions, e_to_Se,
+            augmentation_module_Zbasis, left_S_set_action, e_to_Se,
             extra_greedy=False, ensure_minimal=True, verbose=False)
         root = ResolutionNode(self, mod0, None, mat0)
         self.root = root
         self.node_cache = {}
 
+    def make_actions(self, module):
+        """Given a list of idempotents [e1, ..., en] representing ZSe1(+)...(+)ZSen,
+        Return a list of "action" vectors, one for each element s of S, such that
+        the Z-basis element i gets sent to the Z-basis element action[i]
+        under multiplication by s.
+        """
+        e_to_Se = self.e_to_Se
+        e_to_s_to_ii = self.e_to_s_to_ii
+        op = self.op
+        N = sum(map(len, map(e_to_Se.get, module)))
+        offset = 0
+        S_action_table = [[None] * N for _ in range(len(op))]
+        for e in module:
+            Se = e_to_Se[e]
+            se_to_ii = e_to_s_to_ii[e]
+            index_se_pairs = list(enumerate(Se, offset))
+            for op_s1, table_s1 in zip(op, S_action_table):
+                for index, se in index_se_pairs:
+                    table_s1[index] = offset + se_to_ii[op_s1[se]]
+            offset += len(Se)
+        return list(map(Vector, S_action_table))
 
     def homology_list(self, maxdim, *, right_S_set_action=None, check=True, verbose=False):
         op = self.op
@@ -153,24 +172,34 @@ class ResolutionNode:
         "resolution", # The ProjectiveResolution we belong to
         "module", # a list of idempotents [e1, ..., en]: this node represents ZSe1 (+) ... (+) ZSen
         "prev_module", # The idempotents for the node one dimension lower; the target of the outgoing map
-        "outgoing_matrix_columns", # The transpose of the matrix representing the ZS-linear map out of here
+        "e_images",
         "children", # A list of nodes one dimension higher used to cover the kernel of the outgoing map
     ]
-    def __init__(self, resolution: ProjectiveResolution, module, prev_module, outgoing_matrix_columns):
+    def __init__(self, resolution: ProjectiveResolution, module, prev_module, e_images):
         self.resolution = resolution
         self.module = module
         self.prev_module = prev_module
-        self.outgoing_matrix_columns = outgoing_matrix_columns
-        if self.prev_module is not None:
-            N0 = sum(map(len, map(self.resolution.e_to_Se.get, self.prev_module)))
-            assert set(map(len, self.outgoing_matrix_columns)) <= {N0}
+        self.e_images = e_images
         self.children = None
+        assert len(e_images) == len(module)
 
     def get_children(self, *, verbose=False, max_size_to_ensure_minimal=1000, max_size_to_cache=1000, max_size_for_extra_greedy=200):
         if self.children is not None:
             return self.children
 
-        kernel_basis = self.resolution.kernel_implementation(self.outgoing_matrix_columns)
+        e_to_Se = self.resolution.e_to_Se
+        if self.prev_module is None:
+            assert self is self.resolution.root
+            S_action_on_image = self.resolution.left_S_set_action
+        else:
+            S_action_on_image = self.resolution.make_actions(self.prev_module)
+        # Forget the S-module structure and look at the Z-matrix
+        outgoing_matrix_columns = [
+            vec.shuffled_by_action(S_action_on_image[se])
+            for vec, e in zip(self.e_images, self.module)
+            for se in e_to_Se[e]
+        ]
+        kernel_basis = self.resolution.kernel_implementation(outgoing_matrix_columns)
 
         # Conversion between Z-basis indexes and summand ZSe indexes
         index_to_gen_index = []
@@ -182,28 +211,29 @@ class ResolutionNode:
             gen_index_to_index_range.append(list(range(n0, n1)))
 
         # See if the kernel splits along the given summands
-        indexes, summands = Lattice(len(self.outgoing_matrix_columns), kernel_basis).decompose(gen_index_to_index_range)
+        indexes, summands = Lattice(len(outgoing_matrix_columns), kernel_basis).decompose(gen_index_to_index_range)
         if verbose:
             print(f"split into {len(indexes)} bins: {[len(x) for x in indexes]}")
         children = []
         for index_group, summand in zip(indexes, summands):
             gen_indexes = sorted({index_to_gen_index[ix] for ix in index_group})
             summand_gens = [self.module[gen_index] for gen_index in gen_indexes]
-            split_matrix_columns, split_next_module = cover_submodule(
-                self.resolution.op, self.resolution.e_to_Se, self.resolution.e_to_s_to_ii,
-                summand_gens, summand.get_basis(),
+            split_e_images, split_next_module = cover_submodule_with_actions(
+                summand.get_basis(),
+                self.resolution.make_actions(summand_gens),
+                e_to_Se,
                 extra_greedy=(summand.rank <= max_size_for_extra_greedy),
                 ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
                 verbose=verbose,
             )
-            if sum(map(len, split_matrix_columns)) > max_size_to_cache:
-                child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_matrix_columns)
+            if sum(map(len, split_e_images)) > max_size_to_cache:
+                child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_e_images)
             else:
-                cache_key = tuple(split_next_module), tuple(summand_gens), tuple(map(tuple, split_matrix_columns))
+                cache_key = tuple(split_next_module), tuple(summand_gens), tuple(map(tuple, split_e_images))
                 node_cache = self.resolution.node_cache
                 child = node_cache.get(cache_key)
                 if child is None:
-                    child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_matrix_columns)
+                    child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_e_images)
                     node_cache[cache_key] = child
                 else:
                     if verbose:
@@ -214,31 +244,21 @@ class ResolutionNode:
 
     def outgoing_tensored_invariants(self, right_S_set_action, e_to_Xe, e_to_x_to_ii) -> list[int]:
         if self.prev_module is None:
+            assert self is self.resolution.root
             # This is the root--the outgoing map is deleted.
             return []
 
         X = range(len(right_S_set_action))
         e_to_Se = self.resolution.e_to_Se
-        e_to_s_to_ii = self.resolution.e_to_s_to_ii
+        # e_to_s_to_ii = self.resolution.e_to_s_to_ii
 
         # Tensoring moves from a rank-N0 module sum(ZSej)
         #                   to a rank-N1 module sum(ZXej)
         N0 = sum(map(len, map(e_to_Se.get, self.prev_module)))
-        assert set(map(len, self.outgoing_matrix_columns)) <= {N0}
+        assert set(map(len, self.e_images)) <= {N0}
         N1 = sum(map(len, map(e_to_Xe.get, self.prev_module)))
 
-        def get_e_images():
-            e_images = []
-            offset = 0
-            for e in self.module:
-                ii = e_to_s_to_ii[e][e]
-                image_e = self.outgoing_matrix_columns[offset + ii]
-                e_images.append(image_e)
-                offset += len(e_to_Se[e])
-            assert offset == len(self.outgoing_matrix_columns)
-            assert len(e_images) == len(self.module)
-            return e_images
-        e_images = get_e_images()
+        e_images = self.e_images
 
         def make_X_actions():
             # "actions" to move from sum(ZSe) to sum(ZXe).

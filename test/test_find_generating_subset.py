@@ -8,7 +8,6 @@ def test_find_generating_subset():
     # Z <---augmentation--- ZM
     # where M is 2x2 rectangular band, plus unit
     assert find_generating_subset(
-        5,
         [
             Vector([1,0,0,0,-1]), # x00 - 1
             Vector([0,1,0,0,-1]), # x01 - 1
@@ -33,7 +32,6 @@ def test_find_generating_subset():
     # cover the kernel of
     # Z <---augmentation--- ZM*x00
     assert find_generating_subset(
-        2,
         [
             Vector([1,-1]), # x00-x10
         ],
@@ -52,7 +50,6 @@ def test_find_generating_subset():
     ]
 
     assert find_generating_subset(
-        1,
         [Vector([1])],
         [Vector([0]), Vector([0]), Vector([0]), Vector([0]), Vector([0])],
         [1], False, False,

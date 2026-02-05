@@ -1,12 +1,7 @@
 from collections import Counter
 from functools import cache
 from .find_generating_subset import find_generating_subset
-from .kernels import (
-    mutable_lattice_kernel,
-    mutable_lattice_kernel_with_reshuffling,
-    mutable_lattice_kernel_with_pre_hnf,
-    sage_kernel,
-)
+from .kernels import mutable_lattice_kernel
 from .normalized_invariants import invariant_factors
 from mutable_lattice import Vector, Lattice
 
@@ -19,6 +14,13 @@ def cover_submodule_with_actions(
     ensure_minimal=False,
     verbose=False,
 ):
+    """Cover a given submodule of ZSf1(+)...(+)ZSfn
+    with a map out of some ZSe1(+)...(+)ZSem.
+    Return the image vectors where the each ej should
+    get sent for each summand, along with which idempotents
+    [e1, ..., em] to use.
+    """
+    # This is just a wrapper around find_generating_subset
     def find_fixer_idempotent(vec):
         for e in e_to_Se:
             if vec.shuffled_by_action(actions[e]) == vec:
@@ -77,7 +79,7 @@ class ProjectiveResolution:
                     ij = op[i][j]
                     for k in S:
                         jk = op[j][k]
-                        if op[ij][k] != op[ij][k]:
+                        if op[ij][k] != op[i][jk]:
                             raise ValueError(f"op[op[{i}][{j}]][{k}]=op[{ij}][{k}]={op[ij][k]}, but "
                                              f"op[{i}][op[{j}][{k}]]=op[{i}][{jk}]={op[i][jk]}")
                     for y in Y:
@@ -87,7 +89,7 @@ class ProjectiveResolution:
                                              f"act[{i}][act[{j}][{k}]]=act[{i}][{jy}]={act[i][jy]}")
             if act[identity] != Vector(list(Y)):
                 raise ValueError(f"act[identity]=act[{identity}]={act[identity]} was not identity")
-        e_Se_pairs = [(e, sorted({op[x][e] for x in S})) for e in idempotents]
+        e_Se_pairs = [(e, sorted({op[s][e] for s in S})) for e in idempotents]
         e_to_Se = dict(sorted(e_Se_pairs, key=lambda e_Se: len(e_Se[1])))
         e_to_s_to_ii = {
             e: {x: ii for ii, x in enumerate(Se)}
@@ -151,7 +153,9 @@ class ProjectiveResolution:
                         if act[xi][j] != act[x][ij]:
                             raise ValueError(f"act[act[{x}][{i}]][{j}]=act[{xi}][{j}]={act[xi][j]}, but"
                                              f"act[{x}][op[{i}][{j}]]=act[{x}][{ij}]={act[x][ij]}")
-        e_to_Xe = {e: sorted(right_S_set_action[x][e] for x in X)
+                if act[x][self.identity] != x:
+                    raise ValueError(f"act[{x}][identity={self.identity}] was not {x}")
+        e_to_Xe = {e: sorted({right_S_set_action[x][e] for x in X})
                    for e in self.e_to_Se}
         e_to_x_to_ii = {
             e: {x: ii for ii, x in enumerate(Xe)}
@@ -171,8 +175,9 @@ class ProjectiveResolution:
             outgoing_rank = len(outgoing_invariants(node))
             incoming_rank = incoming.total()
             free_rank = chains_rank - outgoing_rank - incoming_rank
-            result = Counter(d for d in incoming if d > 1) # torsion
-            result[0] = free_rank
+            result = Counter({d:count for d, count in incoming.items() if d > 1}) # torsion
+            if free_rank:
+                result[0] = free_rank
             return result
 
         # homology_with_shift[node, dim] will store the homology dim
@@ -181,7 +186,7 @@ class ProjectiveResolution:
         # Use a stack instead of recursion so we don't blow Python's
         # recursion limit.
         homology_with_shift = {}
-        stack = [(self.root, dim) for dim in range(maxdim + 1)]
+        stack = [(self.root, dim) for dim in reversed(range(maxdim + 1))]
         while stack:
             node, dim = stack[-1]
             if (node, dim) in homology_with_shift:

@@ -6,103 +6,85 @@ If you give R vectors of length N, the result will be
 a list of vectors of length R, the length of which is the nullity.
 """
 
-from mutable_lattice import Lattice, Vector, relations_among, transpose
+from mutable_lattice import relations_among, transpose, Vector, Lattice
 
 def mutable_lattice_kernel(vectors, *, verbose=False):
     if not vectors:
         return []
+    R = len(vectors)
+    N = len(vectors[0])
+    verbose = verbose or R > 1000
     if verbose:
-        print(f"computing kernel of (R={len(vectors)})x(N={len(vectors[0])})")
+        print(f"computing kernel of ({R=})x({N=})")
     relations = relations_among(vectors).get_basis()
     if verbose:
-        print(f"found {len(relations)} relations")
+        print(f"{R}x{N} kernel found {len(relations)} relations")
     return relations
 
-def shuffled_columns(vectors):
-    """Reshuffle all vectors in the same way, so that the least-used entries come first."""
-    if not vectors:
-        return
-    N = len(vectors[0])
-    scores = [0] * N
-    rN = range(N)
-    for v in vectors:
-        for i in filter(v.__getitem__, rN):
-            scores[i] += 10_000_000 + abs(v[i]).bit_length()
-    columns_by_increasing_count = sorted(rN, key=scores.__getitem__)
-    sort_action = [None] * N
-    for i, col in enumerate(columns_by_increasing_count):
-        sort_action[col] = i
-    sort_action = Vector(sort_action)
-    return [v.shuffled_by_action(sort_action) for v in vectors]
+default_kernel = mutable_lattice_kernel
 
-def vector_sortkey(vec):
-    """A pair (-i, abs(vec[i])) indicating the first nonzero entry of the vector.
-    Sorting vectors by this key attempts to make it as easy as possible to
-    add these vectors to a given Lattice.
-    """
-    for i in filter(vec.__getitem__, range(len(vec))):
-        return (-i, abs(vec[i]))
-    return (-len(vec), 1)
+#######################################################
+# The rest of this file has commented-out
+# alternate implementations of kernels for comparison.
+#######################################################
 
-def sorted_rows(vectors):
-    return sorted(vectors, key=vector_sortkey)
+# def mutable_lattice_kernel_with_col_ops(vectors, *, verbose=False):
+#     if not vectors:
+#         return []
+#     R = len(vectors)
+#     N = len(vectors[0])
+#     verbose = verbose or R > 1000
+#     if verbose:
+#         print(f"preworking columns for ({R=})x({N=}) kernel problem")
+#     vectors = transpose(R, Lattice(R, transpose(N, vectors)).get_basis())
+#     assert len(vectors) == R
+#     if verbose:
+#         print(f"shortened: ({N=}) --> (N={len(vectors[0])})")
+#     relations = relations_among(vectors).get_basis()
+#     if verbose:
+#         print(f"{R}x{N} kernel found {len(relations)} relations")
+#     return relations
 
-def mutable_lattice_kernel_with_reshuffling(vectors, verbose=False):
-    if not vectors:
-        return []
-    N = len(vectors[0])
-    R = len(vectors)
-    vectors = shuffled_columns(vectors)
-    augmented_vectors = [
-        Vector(v.tolist() + [0]*i + [1] + [0]*(R-1-i))
-        for i, v in enumerate(vectors)
-    ]
-    augmented_vectors = sorted_rows(augmented_vectors)
-    L = Lattice(N+R, augmented_vectors, maxrank=R)
-    r2p = L._get_row_to_pivot()
-    basis = L.get_basis()
-    assert len(r2p) == len(basis)
-    return [Vector(basis[i].tolist()[N:])
-            for i in range(len(basis)) if r2p[i] >= N]
+# from cypari2 import Pari
+# PARI = Pari()
+# def _pari_hnf_kernel_with_flag(vectors, flag, verbose):
+#     if not vectors:
+#         return []
+#     R = len(vectors)
+#     N = len(vectors[0])
+#     if verbose:
+#         print(f"computing kernel of ({R=})x({N=})")
+#     flat = []
+#     for t in transpose(N, vectors):
+#         flat.extend(t.tolist())
+#     M = PARI.matrix(N, R, flat)
+#     H, U, *maybe_P = M.mathnf(flag)
+#     nullity = len(M) - len(H)
+#     K = U[:nullity]
+#     return [Vector(list(map(int, v))) for v in K]
 
-def shorten_vectors_to_hnf(vectors):
-    N = len(vectors[0])
-    R = len(vectors)
-    columns = transpose(N, vectors)
-    columns = sorted_rows(columns)
-    columns = Lattice(R, columns, maxrank=len(columns)).get_basis()
-    return transpose(R, columns)
+# def pari_hnf_5_kernel(vectors, *, verbose=False):
+#     return _pari_hnf_kernel_with_flag(vectors, 5, verbose)
 
-def mutable_lattice_kernel_with_pre_hnf(vectors, *, verbose=False):
-    if not vectors:
-        return []
-    if verbose:
-        print("Shortening vectors with column ops...")
-    vectors = shorten_vectors_to_hnf(vectors)
-    return mutable_lattice_kernel_with_reshuffling(vectors, verbose=verbose)
+# # from sage.all import Matrix as sage_Matrix, ZZ as sage_ZZ
 
-def sage_kernel(vectors, *, verbose=False):
-    # Only available if running the program from Sage instead of Python.
-    if not vectors:
-        return []
-    N = len(vectors[0])
-    R = len(vectors)
-    from sage.all import Matrix, ZZ
-    M = Matrix(ZZ, N, R, transpose(N, vectors))
-    if verbose:
-        from sage.misc.verbose import set_verbose
-        set_verbose(2)
-    K = M.right_kernel_matrix(
-        # algorithm="default",
-        algorithm="padic",
-        # algorithm="pari",
-        # basis="computed",
-        # basis="echelon",
-        basis="LLL",
-    )
-    if verbose:
-        set_verbose(0)
-    return [Vector(list(map(int, row))) for row in K]
-
-
-
+# def sage_kernel_padic(vectors, *, verbose=False):
+#     # Only available if running the program from Sage instead of Python.
+#     if not vectors:
+#         return []
+#     if verbose:
+#         print(f"computing kernel of (R={len(vectors)})x(N={len(vectors[0])})")
+#     N = len(vectors[0])
+#     R = len(vectors)
+#     M = sage_Matrix(sage_ZZ, N, R, transpose(N, vectors))
+#     K = M.right_kernel_matrix(
+#         algorithm="default",
+#         # algorithm="padic",
+#         # algorithm="pari",
+#         basis="computed",
+#         # basis="echelon",
+#         # basis="LLL",
+#     )
+#     if verbose:
+#         print(f"found {K.ncols()} relations")
+#     return [Vector(list(map(int, row))) for row in K]

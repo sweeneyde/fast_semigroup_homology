@@ -43,7 +43,7 @@ def find_generating_subset(
             return sorted(Zbasis, key=lambda vec: id_to_cost[id(vec)])
         Zbasis = sort_by_increasing_cost()
         if verbose:
-            print(f"sorted by increasing cost")
+            print(f"sorted by increasing cost. Now relativizing...")
 
     def relativize():
         """
@@ -77,7 +77,7 @@ def find_generating_subset(
         for rel_lattice in relative_lattices:
             for rel_vec in rel_lattice.get_basis():
                 for i in filter(rel_vec.__getitem__, range(R)):
-                    column_to_count[i] += 10_000_000 + abs(rel_vec[i]).bit_length()
+                    column_to_count[i] += 1
         columns_by_increasing_count = sorted(range(R), key=column_to_count.__getitem__)
         sort_action = [None] * R
         for i, col in enumerate(columns_by_increasing_count):
@@ -99,7 +99,11 @@ def find_generating_subset(
         """
         new_solution = []
         L = Lattice(R)
-        for i in existing_solution:
+        it = existing_solution
+        if verbose:
+            from tqdm import tqdm
+            it = tqdm(existing_solution, "cover", miniters=1)
+        for i in it:
             if relative_vectors[i] not in L:
                 L += relative_lattices[i]
                 new_solution.append(i)
@@ -111,6 +115,9 @@ def find_generating_subset(
 
     def greedy_cover():
         """Add in the most efficient vector at every step"""
+        if verbose:
+            from tqdm import tqdm
+            progress_bar = tqdm(desc="greedy", miniters=1, total=R)
         solution = []
         uncovered = set(range(R))
         L = Lattice(R)
@@ -130,15 +137,17 @@ def find_generating_subset(
                     best_index = i
             solution.append(best_index)
             uncovered.difference_update(best_newly_covered)
+            if verbose:
+                progress_bar.update(len(best_newly_covered))
             L = best_hypothetical_sum
         if verbose:
+            progress_bar.close()
             print(f"Greedy solution has {len(solution)} vectors")
         return solution
 
     solution = greedy_cover() if extra_greedy else list(range(R))
-    solution = one_pass_cover(solution)
+    solution = one_pass_cover(list(range(R)))
     solution = one_pass_cover(solution[::-1])
-    # (could shuffle the solution and do a few more one-pass covers here)
 
     def do_ensure_minimal(existing_solution):
         """
@@ -150,7 +159,11 @@ def find_generating_subset(
         for i in reversed(existing_solution):
             suffix_sums.append(suffix_sums[-1] + relative_lattices[i])
         prefix_sum = Lattice(R)
-        for j, i in enumerate(existing_solution):
+        it = existing_solution
+        if verbose:
+            from tqdm import tqdm
+            it = tqdm(existing_solution, "minimality", miniters=1)
+        for j, i in enumerate(it):
             rel_vec = relative_vectors[i]
             suff = suffix_sums[len(existing_solution) - j - 1]
             if rel_vec in (prefix_sum + suff):

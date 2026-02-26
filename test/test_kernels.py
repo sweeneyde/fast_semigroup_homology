@@ -1,15 +1,12 @@
 from mutable_lattice import Lattice, Vector
 from fast_monoid_homology.kernels import (
     mutable_lattice_kernel,
-    mutable_lattice_kernel_with_reshuffling,
-    mutable_lattice_kernel_with_pre_hnf,
-    sage_kernel,
+    mutable_lattice_kernel_with_col_ops,
 )
 
 ker_funcs = [
     mutable_lattice_kernel,
-    mutable_lattice_kernel_with_reshuffling,
-    mutable_lattice_kernel_with_pre_hnf,
+    mutable_lattice_kernel_with_col_ops,
 ]
 
 import pytest

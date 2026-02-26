@@ -1,4 +1,4 @@
-from fast_monoid_homology.find_generating_subset import (
+from fast_semigroup_homology.find_generating_subset import (
     find_generating_subset
 )
 from mutable_lattice import Vector

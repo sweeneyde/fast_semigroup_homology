@@ -38,7 +38,7 @@ def _hard_attempt(
         op,
         *,
         peek_dimension=4,
-        verbose=False,        
+        verbose=False,
 ):
     # when that's getting too big, try shuffling things around
     # until a better resolution is available:
@@ -80,7 +80,7 @@ def integral_monoid_homology(
     ...                           [2,3,2,3,2],
     ...                           [2,3,2,3,3],
     ...                           [0,1,2,3,4]], 10)
-    [{0: 1}, {}, {0: 1}, {}, {}, {}, {}, {}, {}, {}, {}]    
+    [{0: 1}, {}, {0: 1}, {}, {}, {}, {}, {}, {}, {}, {}]
     >>> integral_monoid_homology([[0,1,0,1,0,0],
     ...                           [0,1,0,1,0,1],
     ...                           [2,3,2,3,2,2],

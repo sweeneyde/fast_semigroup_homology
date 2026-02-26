@@ -1,5 +1,5 @@
 from collections import Counter
-from fast_monoid_homology.normalized_invariants import invariant_factors
+from fast_semigroup_homology.normalized_invariants import invariant_factors
 import random
 from itertools import pairwise
 from math import gcd

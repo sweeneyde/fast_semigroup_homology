@@ -1,4 +1,4 @@
-from fast_monoid_homology.projective_resolution import ProjectiveResolution
+from fast_semigroup_homology.projective_resolution import ProjectiveResolution
 from mutable_lattice import Vector
 
 def test_trivial():

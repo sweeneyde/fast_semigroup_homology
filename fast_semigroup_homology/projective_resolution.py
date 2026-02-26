@@ -326,7 +326,6 @@ class ResolutionNode:
     def decompose_kernel(self, verbose=False):
         Z_basis_images = self.get_Z_basis_images(verbose=verbose)
         kernel_basis = self.resolution.kernel_implementation(Z_basis_images, verbose=verbose)
-
         if verbose:
             print("preparing to decompose...")
         # Conversion between Z-basis indexes and summand ZSe indexes
@@ -340,7 +339,6 @@ class ResolutionNode:
         if verbose:
             print("making Lattice to decompose...")
         L = Lattice(len(Z_basis_images), kernel_basis)
-   
         # See if the kernel splits along the given summands
         if verbose:
             print("decomposing...")
@@ -368,8 +366,8 @@ class ResolutionNode:
                 summand.get_basis(),
                 self.resolution.make_actions(summand_gens),
                 self.resolution.e_to_Se,
-                ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
                 extra_greedy=(summand.rank <= max_size_for_extra_greedy),
+                ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
                 verbose=verbose,
                 sloppy_last_cover=sloppy_last_cover,
             )

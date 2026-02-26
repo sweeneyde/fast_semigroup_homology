@@ -1,5 +1,5 @@
 from mutable_lattice import Lattice, Vector
-from fast_monoid_homology.kernels import (
+from fast_semigroup_homology.kernels import (
     mutable_lattice_kernel,
     mutable_lattice_kernel_with_col_ops,
 )

@@ -2,11 +2,6 @@
 requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
-[tool.cibuildwheel]
-test-requires = "pytest"
-test-sources = "./test"
-test-command = "python -m pytest"
-
 [project]
 name = "fast_semigroup_homology"
 version = "0.0.1"

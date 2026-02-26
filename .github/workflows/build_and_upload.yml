@@ -1,4 +1,4 @@
-name: Build
+name: Publish Python distribution to PyPI
 
 on:
   push:
@@ -9,58 +9,46 @@ on:
       - published
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        # macos-15-intel is an Intel runner, macos-14 is Apple silicon
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-15-intel, macos-14]
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v3.2.0
-        # env:
-        #   CIBW_SOME_OPTION: value
-        #   ...
-        # with:
-        #   package-dir: .
-        #   output-dir: wheelhouse
-        #   config-file: "{package}/pyproject.toml"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
-          path: ./wheelhouse/*.whl
-
-  make_sdist:
-    name: Make SDist
+  build:
+    needs: [python_test]
+    name: Build distribution
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v5
-
-    - name: Build SDist
-      run: pipx run build --sdist
-
-    - uses: actions/upload-artifact@v4
+    - uses: actions/checkout@v6
       with:
-        name: cibw-sdist
-        path: dist/*.tar.gz
+        persist-credentials: false
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.x"
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v5
+      with:
+        name: python-package-distributions
+        path: dist/
 
-  upload_all:
-    needs: [build_wheels, make_sdist]
+  publish-to-pypi:
+    name: Publish Python distribution to PyPI
+    needs: [build]
     environment: pypi
     permissions:
       id-token: write
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-    - uses: actions/download-artifact@v5
+    - name: Download all the dists
+      uses: actions/download-artifact@v6
       with:
-        pattern: cibw-*
-        path: dist
-        merge-multiple: true
-
-    - uses: pypa/gh-action-pypi-publish@release/v1
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1

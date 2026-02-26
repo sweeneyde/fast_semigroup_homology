@@ -23,11 +23,6 @@ dependencies = [
     "h5py",
 ]
 
-[project.optional-dependencies]
-test = [
-    "pytest",
-]
-
 [project.urls]
 "Homepage" = "https://github.com/sweeneyde/fast_semigroup_homology"
 "Bug Tracker" = "https://github.com/sweeneyde/fast_semigroup_homology"

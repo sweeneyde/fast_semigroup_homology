@@ -21,9 +21,7 @@ H_12: Z^1024
 Elapsed (wall) time: 0:00:00.001716
 ```
 
-## Installation
-
-`python -m pip install git+https://github.com/sweeneyde/fast_semigroup_homology@main`
+## Installation: `pip install fast_semigroup_homology`
 
 ## Usage
 

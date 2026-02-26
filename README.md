@@ -1,7 +1,7 @@
 # Fast Semigroup Homology
 
 This is a package for computing the integral homology of finite semigroups.
-It is very fast:
+It is very fast in most cases:
 
 ```
 $ python -m fast_semigroup_homology -i "010100;010100;232322;232322;010100;010100" -d 12
@@ -30,7 +30,10 @@ Elapsed (wall) time: 0:00:00.001716
 To compute the homology of an individual semigroup with the command line,
 run `python -m fast_semigroup_homology -i "01;10" -d 10` as above, replacing
 the string that follows `-i` with the multiplication table for some semigroup.
-An integer following `-d` indicates the maximum dimension to compute to.
+Such a multiplication table must be entered as strings of digits separated by semicolons,
+all wrapped in quotes. Letters (as in hexadecimal) are also supported
+to allow semigroups of size at most 10+26=36 to be passed in quotes after `-i`.
+The integer following `-d` indicates the maximum dimension to compute to.
 
 Alternatively, you can use this library from python code:
 ```python

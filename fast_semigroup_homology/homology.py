@@ -1,6 +1,6 @@
 from .projective_resolution import ProjectiveResolution
 
-__all__ = ["fast_integral_monoid_homology"]
+__all__ = ["fast_integral_semigroup_homology"]
 
 def permute_op(op, g, flip):
     g_inv = [None] * len(op)
@@ -157,5 +157,5 @@ def fast_integral_semigroup_homology(
     if len(op) == 1:
         return [{0: 1}] + [{}] * maxdim
     elif len(op) in (2, 3):
-        return [{0: 1}] + [{len(op): 1} if i % 2 == 1 else {} for i in range(1, maxdim)]
+        return [{0: 1}] + [{len(op): 1} if i % 2 == 1 else {} for i in range(1, maxdim + 1)]
     return integral_monoid_homology(op, maxdim, verbose=verbose)

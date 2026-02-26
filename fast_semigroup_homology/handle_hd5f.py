@@ -31,7 +31,9 @@ def hdf5_compute_homology(*, multiprocessing_mapper, input_folder, max_order, ma
     for order in range(1, max_order + 1):
         assert order in integer_to_path, (order, integer_to_path)
     integer_to_path = dict(sorted(integer_to_path.items()))
-    output_folder = Path(__file__).parent.parent / "results" / input_folder.name
+    results_folder = Path("results")
+    results_folder.mkdir(exist_ok=True)
+    output_folder = results_folder / input_folder.name
     output_folder.mkdir(exist_ok=True)
     output_filename = f"maxorder{max_order}_maxdim{max_homology_dim}.hdf5"
     output_path = output_folder / output_filename

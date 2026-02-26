@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.cibuildwheel]
+test-command = "python -m pytest"
+
+[project]
+name = "fast_semigroup_homology"
+version = "0.0.1"
+authors = [
+    {name = "Dennis Sweeney", email = "sweeney.427@osu.edu"},
+]
+description = "Compute homology of finite semigroups and monoids"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mutable_lattice>=0.3.0",
+    "tqdm",
+    "h5py",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sweeneyde/fast_semigroup_homology"
+"Bug Tracker" = "https://github.com/sweeneyde/fast_semigroup_homology"

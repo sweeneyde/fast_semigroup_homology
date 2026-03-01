@@ -36,19 +36,18 @@ def homology_worker_small_kernel(index_op_maxdim_bounds):
         )
         return index, str(hgl)
     except KernelJobTooBig as e:
-        print(f"index {index}:", e)
-        return index, "KernelJobTooBig"
+        return index, f"KernelJobTooBig({e})"
 
 def attempt_job_in_parallel(*,
         mapper,
         work_iterator,
 ):
     extended_hgl_to_semigroup_index_list = defaultdict(list)
-    for index, result in mapper(homology_worker_small_kernel, work_iterator):
-        if result == "KernelJobTooBig":
-            return None
+    for index, result_str in mapper(homology_worker_small_kernel, work_iterator):
+        if result_str.startswith("KernelJobTooBig"):
+            return result_str
         else:
-            extended_hgl_to_semigroup_index_list[result].append(index)
+            extended_hgl_to_semigroup_index_list[result_str].append(index)
     for semigroup_index_list in extended_hgl_to_semigroup_index_list.values():
         semigroup_index_list.sort()
     return extended_hgl_to_semigroup_index_list
@@ -70,6 +69,7 @@ def hdf5_refine_homology(*,
         max_bits,
         max_count_to_refine,
 ):
+    failures = []
     import multiprocessing as mp
     mp.set_start_method("spawn")
     pool = mp.Pool(num_cores)
@@ -162,8 +162,9 @@ def hdf5_refine_homology(*,
                         mapper=pool.imap_unordered if len(semigroup_indexes) > 1 else map,
                         work_iterator=work_iterator(),
                     )
-                    if extended_hgl_to_semigroup_index_list is None:
+                    if isinstance(extended_hgl_to_semigroup_index_list, str):
                         print(f"abandoned work on {hgl_shorthand(existing_hgl)}")
+                        failures.append(extended_hgl_to_semigroup_index_list)
                         # abandon this pool and make a new one
                         if len(semigroup_indexes) > 1:
                             pool.terminate()
@@ -193,6 +194,9 @@ def hdf5_refine_homology(*,
                             # Extend the stack to try to go further next time.
                             stack.append([len(semigroup_indexes), hgli, semigroup_indexes])
     pool.terminate()
+    print("---- failures ---")
+    for fail in failures:
+        print(fail)
     return output_filepath
 
 def trim_unused_homology_group_lists(filepath):

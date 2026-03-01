@@ -51,6 +51,12 @@ def main():
     parser.add_argument("-f", "--folder",
                         help="folder of hdf5 files full of semigroups",
                         type=Path, default=None)
+    parser.add_argument("-r", "--refine",
+                        help="path to a completed hdf5 file of homology results",
+                        type=Path, default=None)
+    parser.add_argument("-k", "--max_kernel_vectors",
+                        help="The maximum number of vectors we allow taking the kernel of. Requires -r.",
+                        type=int, default=None)
     parser.add_argument("-i", "--individual",
                         help="a multiplication table of an individual semigroup",
                         type=str, default=None)
@@ -73,11 +79,15 @@ def main():
 
     if args.individual is not None:
         if args.num_cores is not None:
-            raise ValueError(f"Can't pass -c {args.num_cores} with -i.")
+            raise ValueError(f"Can't pass -c with -i.")
         if args.folder is not None:
-            raise ValueError(f"Can't pass -f {args.folder} with -i.")
+            raise ValueError(f"Can't pass -f with -i.")
         if args.maxorder is not None:
-            raise ValueError(f"Can't pass -o {args.maxorder} with -i.")
+            raise ValueError(f"Can't pass -o with -i.")
+        if args.refine is not None:
+            raise ValueError(f"Can't pass -r with -i.")
+        if args.max_kernel_vectors is not None:
+            raise ValueError(f"Can't pass -k with -i.")
         main_individual(
             opstring=args.individual,
             maxdim=args.maxdim,
@@ -88,16 +98,36 @@ def main():
             args.num_cores = 4
         if args.folder is None:
             raise ValueError("Must pass either -i or -f")
-        if args.maxorder is None:
-            raise ValueError("Must pass -o with -f")
-        from .handle_hd5f import main as handle_hdf5_main
-        handle_hdf5_main(
-            num_cores=args.num_cores,
-            max_order=args.maxorder,
-            max_homology_dim=args.maxdim,
-            verbose=args.verbose,
-            hdf5_folder=args.folder,
-            chunksize=args.chunksize
-        )
+        if args.refine is None:
+            if args.maxorder is None:
+                raise ValueError("Must pass -o or -r with -f")
+            if args.max_ker_vectors is None:
+                raise ValueError("Can't pass -k without -r")
+            from .handle_hd5f import main as handle_hdf5_main
+            handle_hdf5_main(
+                num_cores=args.num_cores,
+                max_order=args.maxorder,
+                max_homology_dim=args.maxdim,
+                verbose=args.verbose,
+                hdf5_folder=args.folder,
+                chunksize=args.chunksize
+            )
+        else:
+            if args.maxorder is not None:
+                raise ValueError("Can't pass -o with -r")
+            from .refine_hdf5 import main as refine_hdf5_main
+            k = args.max_kernel_vectors
+            if k is None:
+                k = 1000
+            refine_hdf5_main(
+                input_folder=args.folder,
+                existing_homology_filepath=args.refine,
+                num_cores=args.num_cores,
+                max_homology_dim=args.maxdim,
+                max_R=k,
+                max_N=k,
+                max_bits=k,
+                max_count_to_refine=10**8,
+            )
 
 main()

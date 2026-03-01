@@ -101,7 +101,7 @@ def hdf5_compute_homology(*, multiprocessing_mapper, input_folder, max_order, ma
             print(f"done with {filepath.name}")
     return output_path
 
-def summarize_hdf5_as_markdown(hfile_path, max_homology_dim, dt, num_cores):
+def summarize_hdf5_as_markdown(hfile_path, max_homology_dim, dt, num_cores, extra_info_lines=()):
     SUPER_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹"
     SUB_DIGITS = "₀₁₂₃₄₅₆₇₈₉"
     @cache
@@ -136,6 +136,9 @@ def summarize_hdf5_as_markdown(hfile_path, max_homology_dim, dt, num_cores):
         with open(md_filepath, "w", encoding="utf-8") as f:
             print("# Lists of Homology Groups", file=f)
             print(f"Computation wall time with {num_cores} cores: `{dt}`", file=f)
+            for line in extra_info_lines:
+                print("", file=f)
+                print(line, file=f)
             for dset_name in dset_names:
                 dset = hfile[dset_name]
                 index_counts = Counter()
@@ -159,6 +162,8 @@ def summarize_hdf5_as_markdown(hfile_path, max_homology_dim, dt, num_cores):
                     list_counts.append(([list(d.items()) for d in homology_group_list], count))
                 for homology_group_list, count in sorted(list_counts):
                     row = [f"{count:,}"] + list(map(group_name, homology_group_list))
+                    for _ in range(max_homology_dim + 1 - len(homology_group_list)):
+                        row.append("❓")
                     print(*row, sep=" | ", file=f)
     print(f"Wrote to {md_filepath}.")
 

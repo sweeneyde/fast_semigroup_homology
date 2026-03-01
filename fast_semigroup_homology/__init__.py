@@ -1,1 +1,2 @@
 from .homology import fast_integral_semigroup_homology
+from .projective_resolution import ProjectiveResolution

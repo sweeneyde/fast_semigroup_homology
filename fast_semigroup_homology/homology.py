@@ -1,4 +1,5 @@
 from .projective_resolution import ProjectiveResolution
+from .kernels import default_kernel
 
 __all__ = ["fast_integral_semigroup_homology"]
 
@@ -15,12 +16,13 @@ def _easy_attempt(
         op,
         maxdim,
         *,
+        kernel_implementation,
         peek_dimension=4,
         min_size_to_try_harder=20,
         verbose=False,
 ):
     # first, just try computing with a single resolution:
-    fast_res = ProjectiveResolution(op)
+    fast_res = ProjectiveResolution(op, kernel_implementation=kernel_implementation)
     fast_res.extend_to_dimension(
         peek_dimension,
         sloppy_last_cover=False,
@@ -37,6 +39,7 @@ def _easy_attempt(
 def _hard_attempt(
         op,
         *,
+        kernel_implementation,
         peek_dimension=4,
         verbose=False,
 ):
@@ -49,7 +52,7 @@ def _hard_attempt(
         for g in permutations
         for flip in (False, True)
     ]
-    res_list = [ProjectiveResolution(op) for op in op_list]
+    res_list = [ProjectiveResolution(op, kernel_implementation=kernel_implementation) for op in op_list]
     for res in res_list:
         res.extend_to_dimension(
             peek_dimension,
@@ -65,6 +68,7 @@ def integral_monoid_homology(
         op,
         maxdim,
         *,
+        kernel_implementation=default_kernel,
         peek_dimension=None,
         min_size_to_try_harder=20,
         verbose=False,
@@ -96,10 +100,17 @@ def integral_monoid_homology(
     """
     if peek_dimension is None:
         peek_dimension = max(0, min(4, maxdim - 2))
-    easy_result = _easy_attempt(op, maxdim, peek_dimension=peek_dimension, min_size_to_try_harder=min_size_to_try_harder, verbose=verbose)
+    easy_result = _easy_attempt(op, maxdim,
+                                kernel_implementation=kernel_implementation,
+                                peek_dimension=peek_dimension,
+                                min_size_to_try_harder=min_size_to_try_harder,
+                                verbose=verbose)
     if easy_result is not None:
         return easy_result
-    res = _hard_attempt(op, peek_dimension=peek_dimension, verbose=verbose)
+    res = _hard_attempt(op,
+                        peek_dimension=peek_dimension,
+                        kernel_implementation=kernel_implementation,
+                        verbose=verbose)
     return res.homology_list(
         maxdim,
         max_size_for_extra_greedy=100,

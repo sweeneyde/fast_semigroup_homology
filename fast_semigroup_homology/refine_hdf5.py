@@ -2,6 +2,7 @@ import ast
 from collections import Counter, defaultdict
 import shutil
 
+import tqdm
 import numpy as np
 import h5py
 from mutable_lattice import relations_among
@@ -41,10 +42,15 @@ def homology_worker_small_kernel(index_op_maxdim_bounds):
 def attempt_job_in_parallel(*,
         mapper,
         work_iterator,
+        count,
 ):
     extended_hgl_to_semigroup_index_list = defaultdict(list)
-    for index, result_str in mapper(homology_worker_small_kernel, work_iterator):
+    it = mapper(homology_worker_small_kernel, work_iterator)
+    if count > 1000:
+        it = tqdm.tqdm(it, miniters=1, smoothing=0.0, total=count)
+    for index, result_str in it:
         if result_str.startswith("KernelJobTooBig"):
+            print(result_str)
             return result_str
         else:
             extended_hgl_to_semigroup_index_list[result_str].append(index)
@@ -161,6 +167,7 @@ def hdf5_refine_homology(*,
                     extended_hgl_to_semigroup_index_list = attempt_job_in_parallel(
                         mapper=pool.imap_unordered if len(semigroup_indexes) > 1 else map,
                         work_iterator=work_iterator(),
+                        count = len(semigroup_indexes),
                     )
                     if isinstance(extended_hgl_to_semigroup_index_list, str):
                         print(f"abandoned work on {hgl_shorthand(existing_hgl)}")
@@ -189,7 +196,8 @@ def hdf5_refine_homology(*,
                         assert extended_hgl[:len(existing_hgl)] == existing_hgl
                         print(f"found {hgl_shorthand(extended_hgl)} x{len(semigroup_indexes)}")
                         hgli = get_hgl_index(str(extended_hgl))
-                        hgl_index_dset[semigroup_indexes] = hgli
+                        for i in semigroup_indexes:
+                            hgl_index_dset[i] = hgli
                         if len(extended_hgl)-1 < maxdim_limit:
                             # Extend the stack to try to go further next time.
                             stack.append([len(semigroup_indexes), hgli, semigroup_indexes])

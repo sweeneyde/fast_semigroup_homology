@@ -57,7 +57,7 @@ def _hard_attempt(
         res.extend_to_dimension(
             peek_dimension,
             sloppy_last_cover=False,
-            max_size_for_extra_greedy=100,
+            max_size_for_extra_greedy=50,
             max_size_to_ensure_minimal=100,
             verbose=verbose,
         )
@@ -113,7 +113,7 @@ def integral_monoid_homology(
                         verbose=verbose)
     return res.homology_list(
         maxdim,
-        max_size_for_extra_greedy=100,
+        max_size_for_extra_greedy=50,
         max_size_to_ensure_minimal=100,
         verbose=verbose,
     )

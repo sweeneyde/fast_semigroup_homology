@@ -54,7 +54,7 @@ def main():
     parser.add_argument("-r", "--refine",
                         help="path to a completed hdf5 file of homology results",
                         type=Path, default=None)
-    parser.add_argument("-k", "--max_kernel_vectors",
+    parser.add_argument("-k", "--kernel_bound",
                         help="The maximum number of vectors we allow taking the kernel of. Requires -r.",
                         type=int, default=None)
     parser.add_argument("-i", "--individual",
@@ -86,7 +86,7 @@ def main():
             raise ValueError(f"Can't pass -o with -i.")
         if args.refine is not None:
             raise ValueError(f"Can't pass -r with -i.")
-        if args.max_kernel_vectors is not None:
+        if args.kernel_bound is not None:
             raise ValueError(f"Can't pass -k with -i.")
         main_individual(
             opstring=args.individual,
@@ -116,7 +116,7 @@ def main():
             if args.maxorder is not None:
                 raise ValueError("Can't pass -o with -r")
             from .refine_hdf5 import main as refine_hdf5_main
-            k = args.max_kernel_vectors
+            k = args.kernel_bound
             if k is None:
                 k = 1000
             refine_hdf5_main(

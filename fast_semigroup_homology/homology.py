@@ -31,10 +31,11 @@ def _easy_attempt(
     if fast_res.total_cost(peek_dimension) < min_size_to_try_harder:
         return fast_res.homology_list(
             maxdim,
-            max_size_for_extra_greedy=-1,
             max_size_to_ensure_minimal=-1,
             verbose=verbose)
     return None
+
+MAX_SIZE_TO_ENSURE_MINIMAL = 100
 
 def _hard_attempt(
         op,
@@ -57,8 +58,7 @@ def _hard_attempt(
         res.extend_to_dimension(
             peek_dimension,
             sloppy_last_cover=False,
-            max_size_for_extra_greedy=50,
-            max_size_to_ensure_minimal=100,
+            max_size_to_ensure_minimal=MAX_SIZE_TO_ENSURE_MINIMAL,
             verbose=verbose,
         )
     res = min(res_list, key=lambda r: r.total_cost(peek_dimension))
@@ -113,8 +113,7 @@ def integral_monoid_homology(
                         verbose=verbose)
     return res.homology_list(
         maxdim,
-        max_size_for_extra_greedy=50,
-        max_size_to_ensure_minimal=100,
+        max_size_to_ensure_minimal=MAX_SIZE_TO_ENSURE_MINIMAL,
         verbose=verbose,
     )
 

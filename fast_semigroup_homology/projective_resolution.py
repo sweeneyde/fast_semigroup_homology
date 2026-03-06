@@ -10,7 +10,6 @@ def cover_submodule_with_actions(
     actions: list[Vector],
     e_to_Se: dict[int,tuple[int,...]],
     *,
-    extra_greedy=False,
     ensure_minimal=False,
     verbose=False,
     sloppy_last_cover=False,
@@ -37,7 +36,6 @@ def cover_submodule_with_actions(
     else:
         generating_subset = find_generating_subset(
             Zbasis, actions, costs,
-            extra_greedy=extra_greedy,
             ensure_minimal=ensure_minimal,
             verbose=verbose)
     result_ZS_module = [id_to_idempotent[id(vec)] for vec in generating_subset]
@@ -116,7 +114,7 @@ class ProjectiveResolution:
         augmentation_module_Zbasis = Lattice.full(len(Y)).get_basis()
         mat0, mod0 = cover_submodule_with_actions(
             augmentation_module_Zbasis, left_S_set_action, e_to_Se,
-            extra_greedy=False, ensure_minimal=True, verbose=False)
+            ensure_minimal=True, verbose=False)
         root = ResolutionNode(self, mod0, None, mat0)
         self.root = root
         self.node_cache = {}
@@ -349,7 +347,6 @@ class ResolutionNode:
 
     def get_children(self, *, verbose=False,
                      max_size_to_cache=5000,
-                     max_size_for_extra_greedy=10,
                      max_size_to_ensure_minimal=500,
                      sloppy_last_cover=False):
         if self.children is not None:
@@ -366,7 +363,6 @@ class ResolutionNode:
                 summand.get_basis(),
                 self.resolution.make_actions(summand_gens),
                 self.resolution.e_to_Se,
-                extra_greedy=(summand.rank <= max_size_for_extra_greedy),
                 ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
                 verbose=verbose,
                 sloppy_last_cover=sloppy_last_cover,

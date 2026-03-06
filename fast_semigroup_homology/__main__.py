@@ -101,7 +101,7 @@ def main():
         if args.refine is None:
             if args.maxorder is None:
                 raise ValueError("Must pass -o or -r with -f")
-            if args.max_ker_vectors is None:
+            if args.kernel_bound is not None:
                 raise ValueError("Can't pass -k without -r")
             from .handle_hd5f import main as handle_hdf5_main
             handle_hdf5_main(

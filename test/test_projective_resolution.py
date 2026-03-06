@@ -99,14 +99,15 @@ def test_infinitely_many_Zs():
                            Vector([0,0,0,0,1,0])]
     assert M2.child_gen_indexes == [[1]]
     [M3] = M2.children
-    assert M3.module == [5]
+    assert M3.module == [2, 5]
     assert M3.prev_module == [5]
     assert M3.e_images == [
-        Vector([0,1,0,0,-1,0]),
+        Vector([0,0,1,-1,0,0]),
+        Vector([1,0,0,0,-1,0]),
     ]
-    assert M3.child_gen_indexes == [[0]]
+    assert M3.child_gen_indexes == [[1]]
     [M4] = M3.children
-    assert M4 is M3
+    assert M4 is M2
 
 def test_exponentially_growing_Zs():
     res = ProjectiveResolution([[0,1,0,1,0,0,0],
@@ -154,29 +155,37 @@ def test_exponentially_growing_Zs():
     #     (0,0,x10),(0,0,x11) to x10
     # The kernel of this can be covered in various ways. Here's one solution:
     [M3] = M2.children
-    assert M3.module == [6, 2, 6, 6, 6]
+    assert M3.module == [2, 2, 6, 6, 6, 6]
     assert M3.prev_module == [6, 6] # The kernel is trivial on the first summand.
     assert M3.e_images == [
-        Vector([0,1,0,0,0,0,0, 0,0,0,0,0,-1,0]),
-        Vector([0,0,1,0,0,0,0, 0,0,0,-1,0,0,0]),
+        Vector([0,0,0,1,0,0,0, 0,0,0,-1,0,0,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,1,-1,0,0,0]),
+        Vector([1,0,0,0,0,0,0, 0,0,0,0,0,-1,0]),
         Vector([0,0,0,0,1,0,0, 0,0,0,0,0,-1,0]),
         Vector([0,0,0,0,0,1,0, 0,0,0,0,0,-1,0]),
         Vector([0,0,0,0,0,0,0, 0,0,0,0,1,-1,0]),
     ]
-    assert M3.child_gen_indexes == [[0], [2, 3], [4]]
-    [M4a, M4b, M4c] = M3.children
-    assert M4b is M3
-    assert M4c is M2
-    assert M4a.module == [6, 6]
-    assert M4a.prev_module == [6]
+    assert M3.child_gen_indexes == [[2, 3, 4], [5]]
+    [M4a, M4b] = M3.children
+    assert M4b is M2
+    assert M4a.module == [2, 2, 2, 6, 6, 6, 6, 6, 6]
+    assert M4a.prev_module == [6, 6, 6]
     assert M4a.e_images == [
-        Vector([0,1,0,0,0,-1,0]),
-        Vector([0,0,0,0,1,-1,0]),
+        Vector([0,0,0,1,0,0,0, 0,0,0,0,0,0,0, 0,0,0,-1,0,0,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,0,1,0,0,0, 0,0,0,-1,0,0,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,0,0,0,0,0, 0,0,1,-1,0,0,0]),
+        Vector([1,0,0,0,0,0,0, 0,0,0,0,0,0,0, 0,0,0,0,0,-1,0]),
+        Vector([0,0,0,0,1,0,0, 0,0,0,0,0,0,0, 0,0,0,0,0,-1,0]),
+        Vector([0,0,0,0,0,1,0, 0,0,0,0,0,0,0, 0,0,0,0,0,-1,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,0,0,1,0,0, 0,0,0,0,0,-1,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,0,0,0,1,0, 0,0,0,0,0,-1,0]),
+        Vector([0,0,0,0,0,0,0, 0,0,0,0,0,0,0, 0,0,0,0,1,-1,0]),
     ]
-    assert M4a.child_gen_indexes == [[0], [1]]
-    [M5a, M5b] = M4a.children
+    assert M4a.child_gen_indexes == [[3, 4, 5], [6, 7], [8]]
+    [M5a, M5b, M5c] = M4a.children
     assert M5a is M4a
-    assert M5b is M2
+    assert M5b is M3
+    assert M5c is M2
 
 def test_suspended_C2():
     res = ProjectiveResolution([[0,1,0,1,0,0],

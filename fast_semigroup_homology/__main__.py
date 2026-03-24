@@ -45,9 +45,8 @@ def main_individual(opstring, maxdim, verbose):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(prog="fast_monoid_homology",
-                                     description="compute homology of finite semigroups",
-                                     usage="")
+    parser = argparse.ArgumentParser(prog="fast_semigroup_homology",
+                                     description="compute homology of finite semigroups")
     parser.add_argument("-f", "--folder",
                         help="folder of hdf5 files full of semigroups",
                         type=Path, default=None)

@@ -56,7 +56,7 @@ class ProjectiveResolution:
         "e_to_Se",
         # int -> (int -> int). This stores the index at which element in Se appears in Se, for each e.
         "e_to_s_to_ii",
-        # A mapping from ResolutionNode arguments to ResolutionNode, allowing re-use
+        # A mapping from (module: tuple[int], to_cover: tuple[tuple[int]]) --> ResolutionNode, allowing re-use
         "node_cache",
         # The ResolutionNode for dimension 0 of this resolution
         "root",
@@ -357,32 +357,29 @@ class ResolutionNode:
         for index_group, summand in zip(indexes, summands):
             if summand.rank == 0:
                 continue
+            summand_basis = summand.get_basis()
             gen_indexes = sorted({index_to_gen_index[ix] for ix in index_group})
             summand_gens = [self.module[gen_index] for gen_index in gen_indexes]
-            split_e_images, split_next_module = cover_submodule_with_actions(
-                summand.get_basis(),
-                self.resolution.make_actions(summand_gens),
-                self.resolution.e_to_Se,
-                ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
-                verbose=verbose,
-                sloppy_last_cover=sloppy_last_cover,
-            )
-            if sum(map(len, split_e_images)) > max_size_to_cache:
+            cache_key = child = None
+            if len(summand_gens) <= max_size_to_cache:
+                cache_key = tuple(summand_gens), tuple(map(tuple, summand_basis))
+                child = self.resolution.node_cache.get(cache_key)
+                if verbose and child is not None:
+                    print(f"cache hit on {len(summand_gens)}gens <-- {len(child.module)}gens")
+            if child is None:
                 if verbose:
-                    print("too big to cache")
+                    print("cache miss")
+                split_e_images, split_next_module = cover_submodule_with_actions(
+                    summand_basis,
+                    self.resolution.make_actions(summand_gens),
+                    self.resolution.e_to_Se,
+                    ensure_minimal=(summand.rank <= max_size_to_ensure_minimal),
+                    verbose=verbose,
+                    sloppy_last_cover=sloppy_last_cover,
+                )
                 child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_e_images)
-            else:
-                cache_key = tuple(split_next_module), tuple(summand_gens), tuple(map(tuple, split_e_images))
-                node_cache = self.resolution.node_cache
-                child = node_cache.get(cache_key)
-                if child is None:
-                    child = ResolutionNode(self.resolution, split_next_module, summand_gens, split_e_images)
-                    node_cache[cache_key] = child
-                    if verbose:
-                        print("cache miss")
-                else:
-                    if verbose and len(split_next_module) > 1:
-                        print(f"cache hit on {len(summand_gens)}gens <-- {len(split_next_module)}gens")
+                if cache_key is not None:
+                    self.resolution.node_cache[cache_key] = child
             children.append(child)
             child_gen_indexes.append(gen_indexes)
         if verbose:

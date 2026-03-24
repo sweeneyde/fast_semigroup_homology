@@ -6,37 +6,50 @@ If you give R vectors of length N, the result will be
 a list of vectors of length R, the length of which is the nullity.
 """
 
-from mutable_lattice import relations_among, transpose, Vector, Lattice
+from mutable_lattice import (
+    Vector, Lattice,
+    relations_among,
+    decompose_relations_among,
+)
+
+def mutable_lattice_c_verbose(vecs, /):
+    if not vecs:
+        return []
+    R = len(vecs)
+    N = len(vecs[0])
+    keep = Vector(list(range(N)))
+    vecs = [vec.shuffled_by_action(keep, N+R) for vec in vecs]
+    for i, vec in enumerate(vecs):
+        vec[N + i] = 1
+    L = Lattice(N+R, maxrank=R)
+    from tqdm import tqdm
+    for vec in tqdm(vecs[::-1], miniters=1, ascii=True):
+        L.add_vector(vec)
+    basis = [Vector(v.tolist()[N:]) for v in L.get_basis()
+             if next(filter(v.__getitem__, range(N + R))) >= N]
+    return Lattice(R, basis, maxrank=len(basis)).get_basis()
 
 def mutable_lattice_kernel(vectors, *, verbose=False):
+    if not verbose:
+        return relations_among(vectors).get_basis()
     if not vectors:
         return []
     R = len(vectors)
     N = len(vectors[0])
-    verbose = verbose or R > 1000
+    print(f"getting kernel of ({R=})x({N=})...")
+    relations, subproblem_rows, subproblems = decompose_relations_among(vectors)
     if verbose:
-        print(f"computing kernel of ({R=})x({N=})")
-    relations = relations_among(vectors).get_basis()
-    if verbose:
-        print(f"{R}x{N} kernel found {len(relations)} relations")
-    return relations
-
-def mutable_lattice_kernel_with_col_ops(vectors, *, verbose=False):
-    if not vectors:
-        return []
-    R = len(vectors)
-    N = len(vectors[0])
-    verbose = verbose or R > 1000
-    if verbose:
-        print(f"preworking columns for ({R=})x({N=}) kernel problem")
-    vectors = transpose(R, Lattice(R, transpose(N, vectors)).get_basis())
-    assert len(vectors) == R
-    if verbose:
-        print(f"shortened: ({N=}) --> (N={len(vectors[0])})")
-    relations = relations_among(vectors).get_basis()
-    if verbose:
-        print(f"{R}x{N} kernel found {len(relations)} relations")
-    return relations
+        print(f"found {len(relations)} easy relations")
+        print(f"subproblems:", ",".join([f"(R={len(prob)})x(N={len(prob[0])})" for prob in subproblems]))
+    for rows, subproblem in zip(subproblem_rows, subproblems, strict=True):
+        if verbose:
+            print(f"working on subproblem (R={len(subproblem)})x(N={len(subproblem[0])})...")
+        subker = mutable_lattice_c_verbose(subproblem)
+        if verbose:
+            print(f"(R={len(subproblem)})x(N={len(subproblem[0])}) has {len(subker)} relations")
+        for rel in subker:
+            relations.append(rel.shuffled_by_action(rows, R))
+    return Lattice(R, relations, maxrank=len(relations)).get_basis()
 
 default_kernel = mutable_lattice_kernel
 
@@ -46,14 +59,16 @@ default_kernel = mutable_lattice_kernel
 #######################################################
 
 # from cypari2 import Pari
-# PARI = Pari()
+# PARI = Pari(4*1024*1024*1024)
+
 # def _pari_hnf_kernel_with_flag(vectors, flag, verbose):
 #     if not vectors:
 #         return []
 #     R = len(vectors)
 #     N = len(vectors[0])
+#     verbose = verbose or R > 1000
 #     if verbose:
-#         print(f"computing kernel of ({R=})x({N=})")
+#         print(f"computing PARI kernel of ({R=})x({N=})")
 #     flat = []
 #     for t in transpose(N, vectors):
 #         flat.extend(t.tolist())

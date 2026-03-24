@@ -1,12 +1,12 @@
 from mutable_lattice import Lattice, Vector
 from fast_semigroup_homology.kernels import (
     mutable_lattice_kernel,
-    mutable_lattice_kernel_with_col_ops,
+    mutable_lattice_c_verbose,
 )
 
 ker_funcs = [
     mutable_lattice_kernel,
-    mutable_lattice_kernel_with_col_ops,
+    mutable_lattice_c_verbose,
 ]
 
 import pytest

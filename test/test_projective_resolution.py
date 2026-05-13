@@ -1,4 +1,7 @@
-from fast_semigroup_homology.projective_resolution import ProjectiveResolution
+from fast_semigroup_homology.projective_resolution import (
+    ProjectiveResolution,
+    ResolutionNode,
+)
 from mutable_lattice import Vector
 
 def test_trivial():
@@ -75,6 +78,64 @@ def test_rect22():
     assert M2.prev_module == [4]
     assert M2.e_images == [Vector([1,0,0,0,0]),
                            Vector([0,1,0,0,0])]
+    assert M2.child_gen_indexes == []
+    assert M2.children == []
+
+def test_rect32():
+    res = ProjectiveResolution([[0,1,0,1,0,1,0],
+                                [0,1,0,1,0,1,1],
+                                [2,3,2,3,2,3,2],
+                                [2,3,2,3,2,3,3],
+                                [4,5,4,5,4,5,4],
+                                [4,5,4,5,4,5,5],
+                                [0,1,2,3,4,5,6]])
+    assert res.homology_list(10) == [{0: 1}, {}, {0: 2}] + [{}] * 8
+    res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [6, 6]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [Vector([1, 0, -1]), Vector([0, 1, -1])]
+    assert M1.child_gen_indexes == [[0], [1]]
+    [M2, M2b] = M1.children
+    assert M2b is M2
+    assert M2.module == [0, 0]
+    assert M2.prev_module == [6]
+    assert M2.e_images == [Vector([1,0,0,0,0,0,0]),
+                           Vector([0,1,0,0,0,0,0])]
+    assert M2.child_gen_indexes == []
+    assert M2.children == []
+
+def test_rect23():
+    res = ProjectiveResolution([[0,1,2,0,1,2,0],
+                                [0,1,2,0,1,2,1],
+                                [0,1,2,0,1,2,2],
+                                [3,4,5,3,4,5,3],
+                                [3,4,5,3,4,5,4],
+                                [3,4,5,3,4,5,5],
+                                [0,1,2,3,4,5,6]])
+    assert res.homology_list(10) == [{0: 1}, {}, {0: 2}] + [{}] * 8
+    res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [6]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [Vector([1, -1])]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0, 0, 0]
+    assert M2.prev_module == [6]
+    assert M2.e_images == [Vector([1,0,0,0,0,0,0]),
+                           Vector([0,1,0,0,0,0,0]),
+                           Vector([0,0,1,0,0,0,0])]
     assert M2.child_gen_indexes == []
     assert M2.children == []
 
@@ -186,6 +247,46 @@ def test_exponentially_growing_Zs():
     assert M5a is M4a
     assert M5b is M3
     assert M5c is M2
+
+def test_exponentially_growing_Zs_simplified():
+    res = ProjectiveResolution([[0,1,0,1,0,0,0],
+                                [0,1,0,1,0,0,1],
+                                [2,3,2,3,2,2,2],
+                                [2,3,2,3,2,2,3],
+                                [0,1,0,1,0,0,4],
+                                [0,1,0,1,0,0,5],
+                                [0,1,2,3,4,5,6]])
+    M0 = res.root
+    assert M0.module == [0]
+    M1 = ResolutionNode(res, [6], [0], [Vector([1,-1])])
+    M2 = ResolutionNode(res, [0, 0,6,6], [6], [
+        Vector([0,1,0,0,0,0,0]),
+        Vector([1,0,0,0,0,0,0]),
+        Vector([0,0,0,0,1,0,0]),
+        Vector([0,0,0,0,0,1,0]),
+    ])
+    M3 = ResolutionNode(res, [0,0, 0,6,6, 0,6,6], [0,6,6], [
+        Vector([1,0,  0,-1,0,0,0,0,0,  0,0,0,0,0,0,0]),
+        Vector([1,0,  0,0,0,0,0,0,0,  0,-1,0,0,0,0,0]),
+        Vector([1,0,  -1,0,0,0,0,0,0,  0,0,0,0,0,0,0]),
+        Vector([1,0,  0,0,0,0,-1,0,0,  0,0,0,0,0,0,0]),
+        Vector([1,0,  0,0,0,0,0,-1,0,  0,0,0,0,0,0,0]),
+        Vector([1,0,  0,0,0,0,0,0,0, -1,0,0,0,0,0,0]),
+        Vector([1,0,  0,0,0,0,0,0,0, 0,0,0,0,-1,0,0]),
+        Vector([1,0,  0,0,0,0,0,0,0, 0,0,0,0,0,-1,0]),
+    ])
+    M0.children = [M1]
+    M0.child_gen_indexes = [[0]]
+    M0.assert_exact()
+    M1.children = [M2]
+    M1.child_gen_indexes = [[0]]
+    M1.assert_exact()
+    M2.children = [M3]
+    M2.child_gen_indexes = [[1,2,3]]
+    M2.assert_exact()
+    M3.children = [M3, M3]
+    M3.child_gen_indexes = [[2,3,4],[5,6,7]]
+    M3.assert_exact()
 
 def test_suspended_C2():
     res = ProjectiveResolution([[0,1,0,1,0,0],

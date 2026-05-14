@@ -258,6 +258,10 @@ def test_exponentially_growing_Zs_simplified():
                                 [0,1,2,3,4,5,6]])
     M0 = res.root
     assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes is None
+    assert M0.children is None
     M1 = ResolutionNode(res, [6], [0], [Vector([1,-1])])
     M2 = ResolutionNode(res, [0, 0,6,6], [6], [
         Vector([0,1,0,0,0,0,0]),
@@ -287,6 +291,116 @@ def test_exponentially_growing_Zs_simplified():
     M3.children = [M3, M3]
     M3.child_gen_indexes = [[2,3,4],[5,6,7]]
     M3.assert_exact()
+    assert res.homology_list(10) == [{0: 1}, {}, {0: 1}, {0: 2}, {0: 4}, {0: 8}, {0: 16}, {0: 32}, {0: 64}, {0: 128}, {0: 256}]
+
+def test_moore_C2_3():
+    res = ProjectiveResolution([[0,1,0,1,0,0,0,0,0,0],
+                                [0,1,0,1,0,0,0,1,1,1],
+                                [2,3,2,3,2,2,2,2,2,2],
+                                [2,3,2,3,2,2,2,3,3,3],
+                                [0,1,0,1,0,4,4,0,0,4],
+                                [0,1,2,3,0,5,5,0,0,5],
+                                [0,1,2,3,0,6,6,0,0,6],
+                                [0,1,0,1,4,0,4,7,8,7],
+                                [0,1,0,1,4,4,0,7,8,8],
+                                [0,1,2,3,4,5,6,7,8,9]])
+    assert res.homology_list(10) == [{0: 1}, {}, {}, {2: 1}] + [{}] * 7
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [5]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [Vector([1,-1])]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [7, 9]
+    assert M2.prev_module == [5]
+    assert M2.e_images == [Vector([0,0,1,0,0]),
+                           Vector([0,0,0,1,-1])]
+    assert M2.child_gen_indexes == [[0, 1]]
+    [M3] = M2.children
+    assert M3.module == [0, 7, 5, 7]
+    assert M3.prev_module == [7, 9]
+    assert M3.e_images == [
+        Vector([0,0,0,0,0,  0,1,0,0,0,0,0,0,0,0]),
+        Vector([1,0,0,0,-1, 0,0,0,0,0,0,0,0,1,0]),
+        Vector([0,0,0,0,0,  0,0,0,0,0,1,0,0,0,0]),
+        Vector([0,0,0,0,0,  0,0,0,0,0,0,0,1,1,0]),
+    ]
+    assert M3.child_gen_indexes == [[0,1,2,3]]
+    [M4] = M3.children
+    assert M4.module == [0, 0, 0]
+    assert M4.prev_module == [0, 7, 5, 7]
+    assert M4.e_images == [
+        Vector([2,0, 0,0,0,0,0, 0,0,0,0,0, 0,-1,0,0,0]),
+        Vector([0,0, 1,0,0,0,0, 1,0,0,0,0, -1,0,0,0,0]),
+        Vector([0,0, 0,0,0,0,0, 2,0,0,0,0, -1,0,0,0,0]),
+    ]
+    assert M4.child_gen_indexes == []
+    assert M4.children == []
+
+
+def test_Moore_C2_3():
+    # Direct from semisearch, index 297208 of order13.hdf5:
+    # [[0,1,2,3,0,1,2,3, 0, 0, 0, 0, 0],
+    #  [0,1,2,3,0,1,2,3, 1, 2, 1, 2, 1],
+    #  [0,1,2,3,0,1,2,3, 2, 1, 2, 1, 2],
+    #  [0,1,2,3,0,1,2,3, 1, 2, 2, 1, 3],
+    #  [4,5,6,7,4,5,6,7, 4, 4, 4, 4, 4],
+    #  [4,5,6,7,4,5,6,7, 5, 6, 5, 6, 5],
+    #  [4,5,6,7,4,5,6,7, 6, 5, 6, 5, 6],
+    #  [4,5,6,7,4,5,6,7, 5, 6, 6, 5, 7],
+    #  [0,1,2,3,4,5,6,7, 8, 9, 8, 9, 8],
+    #  [4,5,6,7,0,1,2,3, 9, 8, 9, 8, 9],
+    #  [0,1,2,3,4,5,6,7,10,11,10,11,10],
+    #  [4,5,6,7,0,1,2,3,11,10,11,10,11],
+    #  [0,1,2,3,4,5,6,7, 8, 9,10,11,12]]
+    # Transpose and permute:
+    res = ProjectiveResolution([[0,0,0,0,4,4,4,4, 0, 0, 4, 4, 0],
+                                [1,1,1,1,5,5,5,5, 1, 1, 5, 5, 1],
+                                [2,2,2,2,6,6,6,6, 2, 2, 6, 6, 2],
+                                [3,3,3,3,7,7,7,7, 3, 3, 7, 7, 3],
+                                [0,0,0,0,4,4,4,4, 4, 4, 0, 0, 4],
+                                [1,1,1,1,5,5,5,5, 5, 5, 1, 1, 5],
+                                [2,2,2,2,6,6,6,6, 6, 6, 2, 2, 6],
+                                [3,3,3,3,7,7,7,7, 7, 7, 3, 3, 7],
+                                [0,1,2,0,4,5,6,4, 8, 9,10,11, 8],
+                                [0,1,2,1,4,5,6,5, 8, 9,10,11, 9],
+                                [1,0,2,1,5,4,6,5,10,11, 8, 9,10],
+                                [1,0,2,0,5,4,6,4,10,11, 8, 9,11],
+                                [0,1,2,3,4,5,6,7, 8, 9,10,11,12]])
+    assert res.homology_list(10) == [{0: 1}, {}, {2: 1}] + [{}] * 8
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [12]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [
+        Vector([0,0,1,-1])
+    ]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0, 8]
+    assert M2.prev_module == [12]
+    assert M2.e_images == [
+        Vector([0,0,0,0,1,0,0,0,0,0,0,0,0]),
+        Vector([0,0,0,0,0,0,0,0,1,0,0,-1,0]),
+    ]
+    assert M2.child_gen_indexes == [[1]]
+    [M3] = M2.children
+    assert M3.module == [0]
+    assert M3.prev_module == [8]
+    assert M3.e_images == [
+        Vector([1, 0, 0, 0, 1, 0, 0, 0, 0, 0]),
+    ]
+    assert M3.child_gen_indexes == []
+    assert M3.children == []
 
 def test_suspended_C2():
     res = ProjectiveResolution([[0,1,0,1,0,0],

@@ -26,7 +26,7 @@ if str(gap('LoadPackage("hap")')) != "true":
     quit(1)
 
 
-RESULTS_FILE = Path(__file__) / "results.txt"
+RESULTS_FILE = Path(__file__).parent / "results.txt"
 
 def fprint(*args):
     print(*args)

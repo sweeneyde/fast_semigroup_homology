@@ -343,7 +343,7 @@ def test_moore_C2_3():
     assert M4.children == []
 
 
-def test_Moore_C2_3():
+def test_moore_C2_2():
     # Direct from semisearch, index 297208 of order13.hdf5:
     # [[0,1,2,3,0,1,2,3, 0, 0, 0, 0, 0],
     #  [0,1,2,3,0,1,2,3, 1, 2, 1, 2, 1],
@@ -437,6 +437,31 @@ def test_Q8():
     res.assert_exact()
 
 def test_huge_torsion():
+    # Index 599445 on Order11.hdf5 of Semisearch's
+    # monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units
+    # results folder
+    op = [[0,1,0,1,0,0,0,0,0,0,0],
+          [0,1,0,1,0,0,0,0,0,0,1],
+          [2,3,2,3,2,2,2,2,2,2,2],
+          [2,3,2,3,2,2,2,2,2,2,3],
+          [0,1,0,1,0,0,0,0,0,0,4],
+          [0,1,0,1,0,0,0,0,0,0,5],
+          [0,1,0,1,0,0,0,0,0,0,6],
+          [0,1,0,1,0,0,0,5,4,6,7],
+          [0,1,0,1,0,0,0,6,4,0,8],
+          [0,1,0,1,0,0,0,6,5,4,9],
+          [0,1,2,3,4,5,6,7,8,9,10]]
+    res = ProjectiveResolution(op)
+    assert res.homology_list(6) == [{0: 1},
+                                    {},
+                                    {0: 1},
+                                    {0: 3},
+                                    {0: 6},
+                                    {0: 9},
+                                    {0: 9, 1494640: 1}]
+    res.assert_exact()
+
+    # This is just a permuted version of the above.
     op = [[0,1,0,1,0,0,0,0,0,0,0],
           [0,1,0,1,0,0,0,0,0,0,1],
           [2,3,2,3,2,2,2,2,2,2,2],

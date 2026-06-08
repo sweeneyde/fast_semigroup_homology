@@ -139,7 +139,7 @@ def equivalent_submonoid(op):
             eSe = eS & Se
             if eSe == eS or eSe == Se:
                 good_subsets.append(eSe)
-        T = min(good_subsets, key=len)
+        T = sorted(min(good_subsets, key=len))
         if len(T) == len(op):
             return op
         T_index = {t: i for i, t in enumerate(T)}

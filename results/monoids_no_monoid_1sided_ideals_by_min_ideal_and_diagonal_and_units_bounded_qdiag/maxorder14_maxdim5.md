@@ -1,5 +1,5 @@
 # Lists of Homology Groups
-Computation wall time with 8 cores: `1:50:41.813057`
+Computation wall time with 4 cores: `0:42:24.507346`
 
 ## order1
 

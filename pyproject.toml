@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mutable_lattice>=0.5.0",
+    "mutable_lattice>=0.5.1",
     "tqdm",
     "h5py",
 ]

@@ -130,40 +130,40 @@ def test_cokernel_with_generators_random():
 
 def test_homology_with_generators():
     assert homology_with_generators(
-        2, [Vector([0,0]), Vector([0,0]), Vector([0,0])],
-        4, [Vector([7,7,7,7]),Vector([0,0,5,5])]
+        [Vector([0,0]), Vector([0,0]), Vector([0,0])],
+        [Vector([7,7,7,7]),Vector([0,0,5,5])]
     ) == ([], [])
     assert homology_with_generators(
-        2, [Vector([0,0])],
-        4, [Vector([7,7,7,7]),Vector([7,7,7,7])]
+        [Vector([0,0])],
+        [Vector([7,7,7,7]),Vector([7,7,7,7])]
     ) == ([0], [Vector([1,-1])])
     assert homology_with_generators(
-        2, [Vector([0,0])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3])]
+        [Vector([0,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3])]
     ) == ([0], [Vector([3,-2])])
     assert homology_with_generators(
-        3, [Vector([0,0,0])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([0,0,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([0, 0], [Vector([3,-2, 0]), Vector([0, 0, 1])])
     assert homology_with_generators(
-        3, [Vector([3,-2,0])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([3,-2,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([0], [Vector([0, 0, 1])])
     assert homology_with_generators(
-        3, [Vector([0,0,1])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([0,0,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([0], [Vector([3,-2,0])])
     assert homology_with_generators(
-        3, [Vector([0,0,1]), Vector([3,-2,1])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([0,0,1]), Vector([3,-2,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([], [])
     assert homology_with_generators(
-        3, [Vector([3,-2,-100])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([3,-2,-100])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([0], [Vector([0,0,1])])
     assert homology_with_generators(
-        3, [Vector([-30,20,1])],
-        4, [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+        [Vector([-30,20,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     ) == ([0], [Vector([3,-2,0])])
 
 def test_homology_with_generators_random():
@@ -175,7 +175,7 @@ def test_homology_with_generators_random():
                         Vector([random.randint(-10,10)
                                 for _ in range(kernel.rank)]))
                     for _ in range(R)]
-        invariants, generators = homology_with_generators(N, incoming, K, outgoing)
+        invariants, generators = homology_with_generators(incoming, outgoing)
         L = Lattice(N, incoming)
         L0 = L.copy()
         assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (kernel.rank - L.rank)

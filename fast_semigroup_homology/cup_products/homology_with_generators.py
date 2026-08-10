@@ -132,7 +132,7 @@ def cokernel_with_generators(N, vectors):
     assert invariants[:ones] == [1] * ones
     return invariants[ones:], generators[ones:]
 
-def homology_with_generators(N, incoming, K, outgoing):
+def homology_with_generators(incoming, outgoing):
     """Compute the homology at Z^R ---> Z^N ---> Z^K.
 
     `incoming` is a list of length R specifying the image in Z^N of each basis element of Z^R.

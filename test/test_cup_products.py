@@ -1,0 +1,37 @@
+from fast_semigroup_homology.cup_products import cup_product_matrix
+
+def test_rect22_rect22():
+    rect22 = [[0,1,0,1,0],[0,1,0,1,1],[2,3,2,3,2],[2,3,2,3,3],[0,1,2,3,4]]
+    elements = [(i, j) for i in range(5) for j in range(5)]
+    element_to_index = {ij: index for index, ij in enumerate(elements)}
+    op = [[element_to_index[rect22[xi][yi], rect22[xj][yj]]
+           for yi, yj in elements]
+          for xi, xj in elements]
+    res = cup_product_matrix(op, 2, 2)
+    [[[a],[b]],[[c],[d]]] = res
+    # For invertible integer change of basis matrix P,
+    # we have abs(det(P)) == 1, so upon changing basis, we have
+    #   det(P * A * P^T) == det(P) * det(A) * det(P) == det(A).
+    # Changing basis didn't change the determinant.
+    # In the standard basis of generators for the homology
+    # of S^2 x S^2, we would have the matrix [[0,1],[1,0]],
+    # so check that we at least have the right determinant:
+    assert a*d - b*c == -1, (a,b,c,d)
+
+def test_Z0ZZZ():
+    op = [[0,1,0,1,0,0],
+          [0,1,0,1,0,1],
+          [2,3,2,3,2,2],
+          [2,3,2,3,2,3],
+          [0,1,0,1,0,4],
+          [0,1,2,3,4,5]]
+    [[[c02]]] = cup_product_matrix(op, 0, 2)
+    assert abs(c02) == 1
+    [[[c03]]] = cup_product_matrix(op, 0, 3)
+    assert abs(c03) == 1
+    assert cup_product_matrix(op, 2, 2) == [[[0]]]
+    # assert cup_product_matrix(op, 2, 3) == [[[0]]]
+    # assert cup_product_matrix(op, 3, 3) == [[[0]]]
+    # assert cup_product_matrix(op, 2, 4) == [[[0]]]
+    # assert cup_product_matrix(op, 3, 4) == [[[0]]]
+    # assert cup_product_matrix(op, 4, 4) == [[[0]]]

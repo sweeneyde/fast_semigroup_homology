@@ -1,0 +1,62 @@
+from . import cup_product_matrix
+
+DIM_A = 2
+DIM_B = 2
+
+def cup_product_matrix_worker(id_op):
+    i, op = id_op
+    return i, cup_product_matrix(op, DIM_A, DIM_B)
+
+if __name__ == "__main__":
+    from ast import literal_eval
+    from multiprocessing import Pool
+    from pathlib import Path
+    import random
+
+    import h5py
+    from tqdm import tqdm
+
+    REPO = Path(__file__).parent.parent.parent
+    HOMOLOGY_RESULTS = (
+        REPO
+        / "results"
+        / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units"
+        / "refined_maxorder11_maxdim4.hdf5"
+    )
+    SEMIGROUP_TABLES_FOLDER = (
+        REPO.parent
+        / "semisearch"
+        / "results"
+        / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units"
+    )
+
+    MAXORDER = int(HOMOLOGY_RESULTS.stem.rpartition("_")[0].partition("maxorder")[2])
+
+    with Pool(11) as pool:
+        with h5py.File(HOMOLOGY_RESULTS) as hr_file:
+            good_codes = {
+                code for code, s in enumerate(hr_file["homology_group_lists"])
+                if code > 0
+                and (h := literal_eval(s.decode("ascii")))
+                and 0 in h[DIM_A]
+                and 0 in h[DIM_B]
+                and 0 in h[DIM_A + DIM_B]
+            }
+            for order in range(1, MAXORDER + 1):
+                nontrivial_results = {}
+                hr_dset = hr_file[f"order{order}"]
+                good_ids = [i for i, code in enumerate(hr_dset) if code in good_codes]
+                random.Random(0).shuffle(good_ids)
+                with h5py.File(SEMIGROUP_TABLES_FOLDER / f"order{order}.hdf5") as tables_file:
+                    tables = tables_file["tables"]
+                    worker_data = ((i, tables[:,:,i]) for i in good_ids)
+                    results = pool.imap_unordered(cup_product_matrix_worker, worker_data)
+                    results = tqdm(results, f"order{order}", total=len(good_ids), smoothing=0.0, miniters=1, mininterval=0.1)
+                    for i, matrix in results:
+                        if any(int(z) for x in matrix for y in x for z in y):
+                            nontrivial_results[i] = matrix
+                            print(f"FOUND NONTRIVIAL MATRIX: {matrix} for index {i}")
+                if nontrivial_results:
+                    print(f"{nontrivial_results=}")
+                else:
+                    print("no nontrivial results found")

@@ -1,3 +1,18 @@
+"""
+Search for monoids with nontrivial rational cohomology cup products.
+
+So far, I have found no rational cup products:
+    * H1 = abelianization(groupCompletion(M)) is finite; no free parts
+    * from monoids of order <= 11, no H2 x H2 --> H4.
+    * from monoids of order <= 10, no H2 x H3 --> H5.
+    * from monoids of order <= 9, no H3 x H3 --> H6 nor H2 x H4 --> H6 nor H3 x H4 --> H7
+    * from monoids of order <= 7, no H2 x H5 --> H7 nor H3 x H5 --> H8 nor H4 x H5 --> H9 nor H5 x H5 --> H10
+    * from monoids of order <= 15 with bounded_qdiag, from H2 x H2 --> H4
+
+The first nontrivial cup product I know of is from the 25-element monoid
+    Rect(2,2)^1 x Rect(2,2)^1, with classifying space ~= S2 x S2.
+"""
+
 from . import cup_product_matrix
 
 DIM_A = 2
@@ -20,6 +35,8 @@ if __name__ == "__main__":
     HOMOLOGY_RESULTS = (
         REPO
         / "results"
+        # / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units_bounded_qdiag"
+        # / "maxorder15_maxdim4.hdf5"
         / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units"
         / "refined_maxorder11_maxdim4.hdf5"
     )
@@ -28,6 +45,7 @@ if __name__ == "__main__":
         / "semisearch"
         / "results"
         / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units"
+        # / "monoids_no_monoid_1sided_ideals_by_min_ideal_and_diagonal_and_units_bounded_qdiag"
     )
 
     MAXORDER = int(HOMOLOGY_RESULTS.stem.rpartition("_")[0].partition("maxorder")[2])
@@ -49,6 +67,8 @@ if __name__ == "__main__":
                 random.Random(0).shuffle(good_ids)
                 with h5py.File(SEMIGROUP_TABLES_FOLDER / f"order{order}.hdf5") as tables_file:
                     tables = tables_file["tables"]
+                    if tables.shape[2] != len(hr_dset):
+                        raise ValueError("inconsistent input data files")
                     worker_data = ((i, tables[:,:,i]) for i in good_ids)
                     results = pool.imap_unordered(cup_product_matrix_worker, worker_data)
                     results = tqdm(results, f"order{order}", total=len(good_ids), smoothing=0.0, miniters=1, mininterval=0.1)

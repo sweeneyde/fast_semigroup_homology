@@ -1,5 +1,7 @@
 from mutable_lattice import Vector, Lattice, transpose, xgcd, relations_among
 
+__all__ = ['homology_with_generators']
+
 def _hnf(vectors):
     """Apply row operations to convert to HNF"""
     if not vectors:

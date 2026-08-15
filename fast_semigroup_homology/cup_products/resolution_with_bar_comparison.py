@@ -6,6 +6,11 @@ from ..projective_resolution import ResolutionNode, ProjectiveResolution
 from .homology_with_generators import homology_with_generators
 
 class ResolutionWithBarComparison:
+    """
+    For a finite monoid S, store the data of a projective resolution
+    of the trivial ZS-module Z, along with the data of a chain map
+    to the bar resolution.
+    """
     __slots__ = [
         "base_res", # ProjectiveResolution
         "nodes_by_dimension", # list[list[ComparisonNode]]
@@ -40,6 +45,9 @@ class ResolutionWithBarComparison:
         return results
 
 class BarComparisonNode:
+    """
+    Represent a map from a ResolutionNode to the bar resolution.
+    """
     __slots__ = [
         # A ResolutionNode we're mapping out of
         "base_node",
@@ -59,6 +67,7 @@ class BarComparisonNode:
         self.prev = prev
         self.index_as_child = index_as_child
         if prev is None:
+            # If the base_node ZSe is the root, map it to ZS[] in the bar resolution
             assert base_node.resolution.root is base_node
             assert len(base_node.module) == 1
             self.e_images_in_bar = [{(): 1}]
@@ -68,22 +77,39 @@ class BarComparisonNode:
         gen_indexes = prev.base_node.child_gen_indexes[index_as_child]
         assert [prev.base_node.module[e] for e in gen_indexes] == base_node.prev_module
         e_to_Se = base_node.resolution.e_to_Se
+        identity = base_node.resolution.identity
 
+        # If not at the root, define the chain map f on each generator x by
+        #    f(e) := h(f(d(e))
+        #       where d is the boundary (represented by base_node.e_images),
+        #       f is already defined on the previous module,
+        #       and h is defined by h(x0[x1|...|xn]) = 1[x0|x1|...|xn],
+        # The map h satisfies dh+hd = id, so we can use it to lift a cycle
+        # in the bar resoltution to one of its coboundaries: assuming d(x)=0,
+        # we have d(h(x))=d(h(x))+h(d(x))=(dh+hd)(x)=0, so h(x) is a coboundary of x.
+        # Because d(f(d(e))) = f(d(d(e))) = f(0) = 0, f(d(e)) is indeed a cycle,
+        # so we can lift using h to get a valid chain map: d(f(e)) = d(h(f(d(e))) = f(d(e)).
+        # The listed e_images_in_bar represents the vector 1[x1|...|xn] that
+        # the 1 in ZS would get sent to if present. If only ZSe is present,
+        # its e gets sent to e[x1|...|xn].
         e_images_in_bar = []
         for e_image in base_node.e_images:
+            # This is a "very sparse vector", mapping tuple[int] --> int.
             bar_image = defaultdict(int)
             offset = 0
+            # Iterate over the entries of d(e), one summand at a time
             for gi, e in zip(gen_indexes, base_node.prev_module, strict=True):
-                prev_bar_image = prev.e_images_in_bar[gi]
+                prev_bar_image = prev.e_images_in_bar[gi]  # f(this part of d(e))
                 Se = e_to_Se[e]
                 for ii in range(len(Se)):
                     coeff1 = e_image[offset + ii]
                     if coeff1:
+                        # For each nonzero entry of d(e), add in the corresponding
+                        # multiple of the image of h(f(...))
                         for tup, coeff2 in prev_bar_image.items():
                             bar_image[(Se[ii],) + tup] += coeff1 * coeff2
                 offset += len(Se)
             assert offset == len(e_image)
-            identity = base_node.resolution.identity
             e_images_in_bar.append({
                 tup : count for tup, count in bar_image.items()
                 if count

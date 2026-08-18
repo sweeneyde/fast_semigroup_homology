@@ -43,6 +43,14 @@ def cover_submodule_with_actions(
         print(f"covered rank {len(Zbasis)} with idempotents {Counter(result_ZS_module)}")
     return generating_subset, result_ZS_module
 
+def homology_from_invariants(chains_rank, outgoing_invariants, incoming_invariants):
+    result = Counter(incoming_invariants)
+    result.pop(1, None)
+    free_rank = chains_rank - len(outgoing_invariants) - len(incoming_invariants)
+    if free_rank:
+        result[0] = free_rank
+    return result
+
 class ProjectiveResolution:
     """Data representing a projective resolution of ZZ[S]-modules for some monoid S"""
     __slots__ = [
@@ -179,8 +187,7 @@ class ProjectiveResolution:
                     q.append((child, dim - 1))
         return sum(cost.values())
 
-    def homology_list(self, maxdim, *, right_S_set_action=None, check=True, **kwargs):
-        self.extend_to_dimension(maxdim + 1, sloppy_last_cover=True, **kwargs)
+    def prepare_right_S_set_for_tensoring(self, right_S_set_action=None, check=True):
         op = self.op
         S = range(len(op))
         if right_S_set_action is None:
@@ -207,6 +214,11 @@ class ProjectiveResolution:
             e: {x: ii for ii, x in enumerate(Xe)}
             for e, Xe in e_to_Xe.items()
         }
+        return right_S_set_action, e_to_Xe, e_to_x_to_ii
+
+    def homology_list(self, maxdim, *, right_S_set_action=None, check=True, **kwargs):
+        self.extend_to_dimension(maxdim + 1, sloppy_last_cover=True, **kwargs)
+        right_S_set_action, e_to_Xe, e_to_x_to_ii = self.prepare_right_S_set_for_tensoring(right_S_set_action, check=check)
 
         @cache
         def outgoing_invariants(node) -> list:
@@ -214,21 +226,14 @@ class ProjectiveResolution:
 
         @cache
         def homology(node) -> Counter:
-            incoming = Counter()
-            for child in node.children:
-                incoming.update(outgoing_invariants(child))
             chains_rank = sum(map(len, map(e_to_Xe.get, node.module)))
-            outgoing_rank = len(outgoing_invariants(node))
-            incoming_rank = incoming.total()
-            free_rank = chains_rank - outgoing_rank - incoming_rank
-            result = Counter({d:count for d, count in incoming.items() if d > 1}) # torsion
-            if free_rank:
-                result[0] = free_rank
-            return result
+            outgoing = outgoing_invariants(node)
+            incoming = [d for child in node.children for d in outgoing_invariants(child)]
+            return homology_from_invariants(chains_rank, outgoing, incoming)
 
         # homology_with_shift[node, dim] will store the homology dim
         # dimensions higher in the resolution. This is calculated as
-        # a sum of homology_with_shift[child, dim] for all children.
+        # a sum of homology_with_shift[child, dim-1] for all children.
         # Use a stack instead of recursion so we don't blow Python's
         # recursion limit.
         homology_with_shift = {}
@@ -255,6 +260,34 @@ class ProjectiveResolution:
                 stack.pop()
         return [invariant_factors(homology_with_shift[self.root, dim])
                 for dim in range(maxdim + 1)]
+
+    def has_trivial_homology(self, right_S_set_action=None, check=True):
+        right_S_set_action, e_to_Xe, e_to_x_to_ii = self.prepare_right_S_set_for_tensoring(right_S_set_action, check=check)
+
+        @cache
+        def outgoing_invariants(node) -> list:
+            return node.outgoing_tensored_invariants(right_S_set_action, e_to_Xe, e_to_x_to_ii)
+
+        @cache
+        def homology(node) -> Counter:
+            chains_rank = sum(map(len, map(e_to_Xe.get, node.module)))
+            outgoing = outgoing_invariants(node)
+            incoming = [d for child in node.get_children() for d in outgoing_invariants(child)]
+            return homology_from_invariants(chains_rank, outgoing, incoming)
+
+        if homology(self.root) != Counter({0: 1}):
+            raise ValueError("0th homololgy was not Z")
+        done = set()
+        q = deque(self.root.get_children())
+        while q:
+            node = q.popleft()
+            if node not in done:
+                done.add(node)
+                if homology(node):
+                    return False
+                q.extend(node.get_children())
+        return True
+
 
 class ResolutionNode:
     """

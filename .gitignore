@@ -1,3 +1,6 @@
 *.pyc
 *.pyo
 *.pyd
+build
+.vscode
+*.egg-info

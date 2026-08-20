@@ -413,6 +413,181 @@ def test_suspended_C2():
     assert res.homology_list(100) == [{0: 1}] + [{}, {2: 1}] * 50
     assert res.homology_list(1000) == [{0: 1}] + [{}, {2: 1}] * 500
     res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [4]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [
+        Vector([1,-1])
+    ]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0,0,4]
+    assert M2.prev_module == [4]
+    assert M2.e_images == [
+        Vector([1,0,0,0,0,0]),
+        Vector([0,1,0,0,0,0]),
+        Vector([0,0,0,0,1,1]),
+    ]
+    assert M2.child_gen_indexes == [[0, 1, 2]]
+    [M3] = M2.children
+    assert M3.module == [0, 0, 4]
+    assert M3.prev_module == [0, 0, 4]
+    assert M3.e_images == [
+       Vector([2,0,0,0,-1,0,0,0,0,0]),
+       Vector([0,0,2,0,0,-1,0,0,0,0]),
+       Vector([0,0,0,0,0,0,0,0,1,-1]),
+    ]
+    assert M3.child_gen_indexes == [[2]]
+    [M4] = M3.children
+    assert M4 is M2
+
+def test_suspended_C2_transposed():
+    res = ProjectiveResolution([[0,1,0,1,0,1],
+                                [0,1,0,1,1,0],
+                                [2,3,2,3,2,3],
+                                [2,3,2,3,3,2],
+                                [0,1,2,3,4,5],
+                                [0,1,2,3,5,4]])
+    assert res.homology_list(10) == [{0: 1}, {}, {2: 1}, {}, {2: 1}, {}, {2: 1}, {}, {2: 1}, {}, {2: 1}]
+    res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [4]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [
+        Vector([1,-1])
+    ]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0, 4]
+    assert M2.prev_module == [4]
+    assert M2.e_images == [
+        Vector([0,1,0,0,0,0]),
+        Vector([0,0,0,0,1,-1]),
+    ]
+    assert M2.child_gen_indexes == [[1]]
+    [M3] = M2.children
+    assert M3.module == [4]
+    assert M3.prev_module ==  [4]
+    assert M3.e_images == [
+        Vector([0,0,0,0,1,1]),
+    ]
+    assert M3.child_gen_indexes == [[0]]
+    [M4] = M3.children
+    assert M4.module == [4]
+    assert M4.prev_module == [4]
+    assert M4.e_images == [
+        Vector([0,0,0,0,1,-1]),
+    ]
+    assert M4.child_gen_indexes == [[0]]
+    [M5] = M4.children
+    assert M5 is M3
+
+def test_rect22_adjoin_C2_trivially():
+    res = ProjectiveResolution([[0,1,0,1,0,0],
+                                [0,1,0,1,1,1],
+                                [2,3,2,3,2,2],
+                                [2,3,2,3,3,3],
+                                [0,1,2,3,4,5],
+                                [0,1,2,3,5,4]])
+    assert res.homology_list(10) == [{0: 1}, {}, {0: 1}] + [{2: 1}, {}] * 4
+    res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [4]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [
+        Vector([1,-1])
+    ]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0, 0, 4]
+    assert M2.prev_module == [4]
+    assert M2.e_images == [
+        Vector([1,0,0,0,0,0]),
+        Vector([0,1,0,0,0,0]),
+        Vector([0,0,0,0,1,-1]),
+    ]
+    assert M2.child_gen_indexes == [[2]]
+    [M3] = M2.children
+    assert M3.module == [0, 0, 4]
+    assert M3.prev_module == [4]
+    assert M3.e_images == [
+        Vector([1,0,0,0,0,0]),
+        Vector([0,1,0,0,0,0]),
+        Vector([0,0,0,0,1,1]),
+    ]
+    assert M3.child_gen_indexes == [[0, 1, 2]]
+    [M4] = M3.children
+    assert M4.module == [0, 0, 4]
+    assert M4.prev_module == [0, 0, 4]
+    assert M4.e_images == [
+        Vector([2,0,0,0,-1,0,0,0,0,0]),
+        Vector([0,0,2,0,0,-1,0,0,0,0]),
+        Vector([0,0,0,0,0,0,0,0,1,-1]),
+    ]
+    assert M4.child_gen_indexes == [[2]]
+    [M5] = M4.children
+    assert M5 is M3
+
+def test_rect22_adjoin_C2_leftrightaction():
+    res = ProjectiveResolution([[0,1,0,1,0,1],
+                                [0,1,0,1,1,0],
+                                [2,3,2,3,2,3],
+                                [2,3,2,3,3,2],
+                                [0,1,2,3,4,5],
+                                [2,3,0,1,5,4]])
+    assert res.homology_list(10) == [{0: 1}, {}, {0: 1}] + [{2: 1}, {}] * 4
+    res.assert_exact()
+    M0 = res.root
+    assert M0.module == [0]
+    assert M0.prev_module is None
+    assert M0.e_images == [Vector([1])]
+    assert M0.child_gen_indexes == [[0]]
+    [M1] = M0.children
+    assert M1.module == [4]
+    assert M1.prev_module == [0]
+    assert M1.e_images == [
+        Vector([1,-1])
+    ]
+    assert M1.child_gen_indexes == [[0]]
+    [M2] = M1.children
+    assert M2.module == [0, 4]
+    assert M2.prev_module == [4]
+    assert M2.e_images == [
+        Vector([0,1,0,0,0,0]),
+        Vector([0,0,0,0,1,1]),
+    ]
+    assert M2.child_gen_indexes == [[1]]
+    [M3] = M2.children
+    assert M3.module == [4]
+    assert M3.prev_module == [4]
+    assert M3.e_images == [
+        Vector([0,0,0,0,1,-1]),
+    ]
+    assert M3.child_gen_indexes == [[0]]
+    [M4] = M3.children
+    assert M4.module == [4]
+    assert M4.prev_module == [4]
+    assert M4.e_images == [
+        Vector([0,0,0,0,1,1]),
+    ]
+    assert M4.child_gen_indexes == [[0]]
+    [M5] = M4.children
+    assert M5 is M3
 
 def test_C2xC2():
     res = ProjectiveResolution([[0,1,2,3],[1,0,3,2],[2,3,0,1],[3,2,1,0]])

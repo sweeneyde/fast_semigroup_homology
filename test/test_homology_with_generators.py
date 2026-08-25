@@ -12,6 +12,8 @@ from fast_semigroup_homology.cup_products.homology_with_generators import (
     cokernel_with_generators,
     _inverse,
     homology_with_generators,
+    cokernel_with_generators_and_projection,
+    homology_with_generators_and_projection,
 )
 
 def test__inverse():
@@ -187,3 +189,93 @@ def test_homology_with_generators_random():
             assert d*v in L0
             L.add_vector(v)
         assert L == kernel
+
+def test_cokernel_with_generators_and_projection():
+    invariants, generators, projection = cokernel_with_generators_and_projection(
+        3, [Vector([1,0,0]), Vector([0,0,1])])
+    assert invariants == [0]
+    assert generators == [Vector([0, 1, 0])]
+    assert projection(Vector([123, 456, 789])) == [456]
+
+    invariants, generators, projection = cokernel_with_generators_and_projection(
+        3, [Vector([1,0,0]), Vector([0, 100, 0]), Vector([0,0,1])])
+    assert invariants == [100]
+    assert generators == [Vector([0, 1, 0])]
+    assert projection(Vector([123, 456, 789])) == [56]
+
+    invariants, generators, projection = cokernel_with_generators_and_projection(
+        3, [Vector([0,2,2]), Vector([0,0,4])])
+    assert invariants == [2, 4, 0]
+    assert generators == [Vector([0, 1, 1]), Vector([0, 0, 1]), Vector([1, 0, 0])]
+    assert projection(Vector([2, 3, 5])) == [1, 2, 2]
+    assert projection(Vector([7, 7, 7])) == [1, 0, 7]
+
+def test_cokernel_with_generators_and_projection_random():
+    for N, R, _ in itertools.product(range(5), repeat=3):
+        data = [Vector([random.randint(-10, 10) for _ in range(N)]) for _ in range(R)]
+        invariants, generators, projection = cokernel_with_generators_and_projection(N, data)
+        L = Lattice(N, data)
+        L0 = L.copy()
+        assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (N - L.rank)
+        for d, v in zip(invariants, generators):
+            for k in range(1, d):
+                assert k*v not in L
+                assert k*v not in L0
+            assert d*v in L
+            assert d*v in L0
+            L.add_vector(v)
+        assert L.is_full()
+        for i, gen in enumerate(generators):
+            assert projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1), data
+        zero = Vector.zero(N)
+        for v in data:
+            v1 = sum((x*gen for x, gen in zip(projection(v), generators)), start=zero)
+            assert v1 - v in L0
+
+def test_homology_with_generators_and_projection():
+    invariants, generators, projection = homology_with_generators_and_projection(
+        [Vector([0,0])],
+        [Vector([7,7,7,7]),Vector([7,7,7,7])]
+    )
+    assert invariants == [0]
+    assert generators == [Vector([1, -1])]
+    assert projection(Vector([2,-2])) == [2]
+
+    invariants, generators, projection = homology_with_generators_and_projection(
+        [Vector([3,-2,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert invariants == [0]
+    assert generators == [Vector([0, 0, 1])]
+    assert projection(Vector([0, 0, 1])) == [1]
+    assert projection(Vector([3, -2, 1])) == [1]
+    assert projection(Vector([300, -200, 17])) == [17]
+
+
+def test_homology_with_generators_and_projection_random():
+    for K, N, R, _ in itertools.product(range(5), repeat=4):
+        outgoing = [Vector([random.randint(-10,10) for _ in range(K)])
+                    for _ in range(N)]
+        kernel = relations_among(outgoing)
+        incoming = [kernel.linear_combination(
+                        Vector([random.randint(-10,10)
+                                for _ in range(kernel.rank)]))
+                    for _ in range(R)]
+        invariants, generators, projection = homology_with_generators_and_projection(incoming, outgoing)
+        L = Lattice(N, incoming)
+        L0 = L.copy()
+        assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (kernel.rank - L.rank)
+        for d, v in zip(invariants, generators):
+            for k in range(1, d):
+                assert k*v not in L
+                assert k*v not in L0
+            assert d*v in L
+            assert d*v in L0
+            L.add_vector(v)
+        assert L == kernel
+        for i, gen in enumerate(generators):
+            assert projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1)
+        zero = Vector.zero(N)
+        for v in incoming:
+            v1 = sum((x*gen for x, gen in zip(projection(v), generators)), start=zero)
+            assert v1 - v in L0

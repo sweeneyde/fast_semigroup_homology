@@ -36,9 +36,9 @@ def _smith_with_coefficients_unnormalized(N0, vectors):
     R = len(vectors)
     # Try column ops first because they're easier
     columns = transpose(N0, vectors)
+    del vectors
     columns = _hnf(columns)
     N = len(columns)
-    del vectors
     augmented = _hnf(_augment_id(transpose(R, columns)))
     # Repeat column ops and row ups until diagonal. Because we did the initial column steps,
     # the first N columns already have rank N, so we only need to check to the right
@@ -74,7 +74,7 @@ def _normalize_pair(d1, v1, d2, v2):
 def _normalize_smith_with_coefficients(invariants, coefficient_vectors):
     """
     Repeatedly apply _normalize_pair to apply the SNF divisibility constraint
-    to diagonal matrix with associated coefficient vectors
+    to a diagonal matrix with associated coefficient vectors
     """
     vecs, invars, zeros = [], [], []
     for d, v in zip(invariants, coefficient_vectors, strict=True):
@@ -121,7 +121,8 @@ def _cokernel_with_generators_unfiltered(N, vectors):
     R = len(vectors)
     columns = transpose(N, vectors)
     invariants, column_coefficient_vectors = _smith_with_coefficients(R, columns)
-    return invariants, _inverse(transpose(N, column_coefficient_vectors))
+    generators = _inverse(transpose(N, column_coefficient_vectors))
+    return invariants, generators
 
 def cokernel_with_generators(N, vectors):
     """
@@ -145,3 +146,35 @@ def homology_with_generators(incoming, outgoing):
     invariants, rel_generators = cokernel_with_generators(kernel.rank, relative)
     generators = list(map(kernel.linear_combination, rel_generators))
     return invariants, generators
+
+def cokernel_with_generators_and_projection(N, vectors):
+    vectors = _hnf(vectors)
+    R = len(vectors)
+    columns = transpose(N, vectors)
+    invariants, column_coefficient_vectors = _smith_with_coefficients(R, columns)
+    ones = sum(1 for d in invariants if d == 1)
+    assert invariants[:ones] == [1] * ones
+    standard_basis_to_nontrivial_generator_coeffs = transpose(N, column_coefficient_vectors[ones:])
+    generators = _inverse(transpose(N, column_coefficient_vectors))
+    def projection(v):
+        if len(v) != N:
+            raise ValueError(f"expected len(v)={N}, but got {len(v)=}")
+        result = Vector.zero(N - ones)
+        for vi, gen_coeffs_i in zip(v, standard_basis_to_nontrivial_generator_coeffs):
+            result += vi * gen_coeffs_i
+        return [x % d if d else x for (x, d) in zip(result, invariants[ones:], strict=True)]
+    return invariants[ones:], generators[ones:], projection
+
+def homology_with_generators_and_projection(incoming, outgoing):
+    """Compute the homology at Z^R ---> Z^N ---> Z^K.
+
+    `incoming` is a list of length R specifying the image in Z^N of each basis element of Z^R.
+    `outgoing` is likewise a list of length N of vectors of length K.
+    """
+    kernel = relations_among(outgoing)
+    relative = list(map(kernel.coefficients_of, incoming))
+    invariants, rel_generators, rel_projection = cokernel_with_generators_and_projection(kernel.rank, relative)
+    generators = list(map(kernel.linear_combination, rel_generators))
+    def projection(v):
+        return rel_projection(kernel.coefficients_of(v))
+    return invariants, generators, projection

@@ -1,4 +1,4 @@
-from fast_semigroup_homology.rewriting.knuth_bendix import (
+from fast_semigroup_homology.cup_products.rewriting.knuth_bendix import (
     shortlex_ordered,
     normalize_rules,
     reduced,

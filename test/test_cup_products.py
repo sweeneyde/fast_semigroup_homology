@@ -1,4 +1,7 @@
-from fast_semigroup_homology.cup_products import cup_product_matrix
+from fast_semigroup_homology.cup_products import (
+    BarComplex,
+    cup_product_matrix
+)
 
 def test_rect22_rect22():
     rect22 = [[0,1,0,1,0],[0,1,0,1,1],[2,3,2,3,2],[2,3,2,3,3],[0,1,2,3,4]]
@@ -35,3 +38,43 @@ def test_Z0ZZZ():
     # assert cup_product_matrix(op, 2, 4) == [[[0]]]
     # assert cup_product_matrix(op, 3, 4) == [[[0]]]
     # assert cup_product_matrix(op, 4, 4) == [[[0]]]
+
+def test_C2():
+    res = BarComplex([[0,1],[1,0]])
+    assert res.cup_product_exponents(0, 0) == ([0], [0], [[0]])
+    assert res.cup_product_exponents(0, 1) == ([0], [], [[]])
+    assert res.cup_product_exponents(1, 0) == ([], [0], [])
+    assert res.cup_product_exponents(0, 2) == ([0], [2], [[2]])
+    assert res.cup_product_exponents(1, 1) == ([], [], [])
+    assert res.cup_product_exponents(2, 0) == ([2], [0], [[2]])
+    assert res.cup_product_exponents(0, 3) == ([0], [], [[]])
+    assert res.cup_product_exponents(1, 2) == ([], [2], [])
+    assert res.cup_product_exponents(2, 1) == ([2], [], [[]])
+    assert res.cup_product_exponents(3, 0) == ([], [0], [])
+    assert res.cup_product_exponents(0, 4) == ([0], [2], [[2]])
+    assert res.cup_product_exponents(1, 3) == ([], [], [])
+    assert res.cup_product_exponents(2, 2) == ([2], [2], [[2]])
+    assert res.cup_product_exponents(3, 1) == ([], [], [])
+    assert res.cup_product_exponents(4, 0) == ([2], [0], [[2]])
+
+def test_C3():
+    res = BarComplex([[0,1,2],[1,2,0],[2,0,1]])
+    assert res.cup_product_exponents(0, 0) == ([0], [0], [[0]])
+    assert res.cup_product_exponents(0, 1) == ([0], [], [[]])
+    assert res.cup_product_exponents(1, 0) == ([], [0], [])
+    assert res.cup_product_exponents(0, 2) == ([0], [3], [[3]])
+    assert res.cup_product_exponents(1, 1) == ([], [], [])
+    assert res.cup_product_exponents(2, 0) == ([3], [0], [[3]])
+    assert res.cup_product_exponents(0, 3) == ([0], [], [[]])
+    assert res.cup_product_exponents(1, 2) == ([], [3], [])
+    assert res.cup_product_exponents(2, 1) == ([3], [], [[]])
+    assert res.cup_product_exponents(3, 0) == ([], [0], [])
+    assert res.cup_product_exponents(0, 4) == ([0], [3], [[3]])
+    assert res.cup_product_exponents(1, 3) == ([], [], [])
+    assert res.cup_product_exponents(2, 2) == ([3], [3], [[3]])
+    assert res.cup_product_exponents(3, 1) == ([], [], [])
+    assert res.cup_product_exponents(4, 0) == ([3], [0], [[3]])
+
+# def test_SusC2():
+#     res = BarComplex([[0,1,0,1,0,1],[0,1,0,1,1,0],[2,3,2,3,2,3],[2,3,2,3,3,2],[0,1,2,3,4,5],[0,1,2,3,5,4]])
+#     assert res.cup_product_exponents(3, 3) == ([2], [2], [[1]])

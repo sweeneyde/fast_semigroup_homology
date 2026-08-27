@@ -15,7 +15,8 @@ from collections import Counter, defaultdict, deque
 from itertools import permutations
 from enum import Enum
 
-from mutable_lattice import Vector, Lattice
+from mutable_lattice import Vector, Lattice, transpose
+from ..homology_with_generators import homology
 
 class CellType(Enum):
     DEGENERATE = 0
@@ -39,6 +40,8 @@ class CompleteRewritingSystem:
         "operation_cache",
         "classify_pair_cache",
         "essential_representation_cache",
+        "coboundary_matrix_cache",
+        "cohomology_cache",
     ]
 
     def reduce(self, word):
@@ -140,6 +143,8 @@ class CompleteRewritingSystem:
         self.operation_cache = {}
         self.classify_pair_cache = {}
         self.essential_representation_cache = {}
+        self.coboundary_matrix_cache = {}
+        self.cohomology_cache = {}
 
     def compute_essentials(self, maxdim):
         while len(self.essentials) <= maxdim:
@@ -203,9 +208,6 @@ class CompleteRewritingSystem:
         return result
 
     def classify_cell(self, cell):
-        assert isinstance(cell, tuple)
-        for x in cell:
-            assert isinstance(x, str), cell
         if len(cell) == 0:
             return (ESSENTIAL, None)
         if "" in cell:
@@ -239,9 +241,6 @@ class CompleteRewritingSystem:
             yield i, face
 
     def _essential_representation_internal(self, cell):
-        assert isinstance(cell, tuple)
-        for x in cell:
-            assert isinstance(x, str)
         kind, data = self.classify_cell(cell)
         if kind == ESSENTIAL:
             return {cell: 1}
@@ -261,9 +260,6 @@ class CompleteRewritingSystem:
         return result
 
     def essential_representation(self, cell):
-        assert isinstance(cell, tuple)
-        for x in cell:
-            assert isinstance(x, str), cell
         if (cached := self.essential_representation_cache.get(cell)) is not None:
             return cached
         result = self._essential_representation_internal(cell)
@@ -294,6 +290,15 @@ class CompleteRewritingSystem:
             result.append(v)
         return result
 
+    def coboundary_matrix(self, dim):
+        if dim == -1:
+            return []
+        if dim not in self.coboundary_matrix_cache:
+            boundary = self.boundary_vectors(dim + 1)
+            N = len(self.essentials[dim])
+            self.coboundary_matrix_cache[dim] = transpose(N, boundary)
+        return self.coboundary_matrix_cache[dim]
+
     def boundary_nonzero_invariants(self, dim):
         if dim == 0:
             return []
@@ -317,5 +322,34 @@ class CompleteRewritingSystem:
             else:
                 result.append(torsion)
         return result
+
+    def cohomology_list(self, maxdim):
+        invariants = list(map(self.boundary_nonzero_invariants, range(maxdim + 2)))
+        result = []
+        for dim in range(maxdim + 1):
+            outgoing = invariants[dim]
+            incoming = invariants[dim + 1]
+            free_rank = len(self.essentials[dim]) - len(outgoing) - len(incoming)
+            torsion = dict(Counter(outgoing))
+            torsion.pop(1, None)
+            if free_rank:
+                result.append({0 : free_rank} | torsion)
+            else:
+                result.append(torsion)
+        return result
+
+    def cohomology_with_generators(self, dim):
+        if dim not in self.cohomology_cache:
+            incoming = self.coboundary_matrix(dim - 1)
+            outgoing = self.coboundary_matrix(dim)
+            h = homology(incoming, outgoing)
+            generators = h.get_generators()
+            invariants = h.get_invariants()
+            ess_dim = self.essentials[dim]
+            bar_gens = [{ess_dim[i] : gen[i]
+                         for i in filter(gen.__getitem__, range(len(ess_dim)))}
+                        for gen in generators]
+            self.cohomology_cache[dim] = invariants, bar_gens
+        return self.cohomology_cache[dim]
 
 CRS = CompleteRewritingSystem

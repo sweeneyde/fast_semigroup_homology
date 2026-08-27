@@ -114,10 +114,6 @@ class BarComplex:
     def cup_product_matrix(self, a, b):
         a_invariants, a_gens = self.cohomology_with_generators(a)
         b_invariants, b_gens = self.cohomology_with_generators(b)
-        if not a_gens:
-            return a_invariants, b_invariants, []
-        if not b_gens:
-            return a_invariants, b_invariants, [[]] * len(a_gens)
         ab_invariants, ab_gens, ab_projection = self.cohomology_with_generators_and_projection(a + b)
         result = []
         for da, a_gen in zip(a_invariants, a_gens):
@@ -128,6 +124,8 @@ class BarComplex:
                     for tup_b, kb in b_gen.items():
                         cup[self.tuple_to_index(tup_a + tup_b)] += ka*kb
                 result_row.append(ab_projection(cup))
+            result.append(result_row)
+        return a_invariants, b_invariants, ab_invariants, result
 
     def cup_product_exponents(self, a, b):
         a_invariants, a_gens = self.cohomology_with_generators(a)

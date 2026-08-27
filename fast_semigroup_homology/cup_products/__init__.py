@@ -1,8 +1,9 @@
 from .resolution_with_bar_comparison import ResolutionWithBarComparison
 
 from .bar_complex import BarComplex
+from .rewriting.op_to_crs import find_best_gens_crs
 
-def cup_product_matrix(op, a, b):
+def cup_product_freepart_matrix(op, a, b):
     # Recall the universal coefficients theorem:
     bar = BarComplex(op)
     a_gens = bar.cohomology_freepart_with_generators(a)
@@ -21,3 +22,6 @@ def cup_product_matrix(op, a, b):
         for a_gen in a_gens
     ]
 
+def cup_product_matrix(op, a, b):
+    crs = find_best_gens_crs(op)
+    raise NotImplementedError

@@ -8,11 +8,7 @@ def test_trivial():
     assert crs.essentials == [((),), (), (), (), ()]
     assert crs.essential_counts(4) == [1, 0, 0, 0, 0]
     assert crs.homology_list(3) == [{0: 1}, {}, {}, {}]
-    assert crs.op_table_with_map() == (
-        [""],
-        {"": 0},
-        [[0]]
-    )
+    assert crs.op_table([""]) == [[0]]
 
 def test_onegen():
     crs = CRS("x", [("xx", "x")])
@@ -27,16 +23,8 @@ def test_onegen():
     ]
     assert crs.essential_counts(4) == [1, 1, 1, 1, 1]
     assert crs.homology_list(3) == [{0: 1}, {}, {}, {}]
-    assert crs.op_table_with_map() == (
-        ["", "x"],
-        {"": 0, "x": 1},
-        [[0, 1], [1, 1]],
-    )
-    assert crs.op_table_with_map(["x", ""]) == (
-        ["x", ""],
-        {"x": 0, "": 1},
-        [[0, 0], [0, 1]],
-    )
+    assert crs.op_table(["", "x"]) == [[0, 1], [1, 1]]
+    assert crs.op_table(["x", ""]) == [[0, 0], [0, 1]]
 
 def test_C2():
     crs = CRS("x", [("xx", "")])
@@ -56,11 +44,7 @@ def test_C2():
     assert crs.boundary_nonzero_invariants(3) == []
     assert crs.boundary_nonzero_invariants(4) == [2]
     assert crs.homology_list(3) == [{0: 1}, {2: 1}, {}, {2: 1}]
-    assert crs.op_table_with_map() == (
-        ["", "x"],
-        {"": 0, "x": 1},
-        [[0, 1], [1, 0]],
-    )
+    assert crs.op_table(["", "x"]) == [[0, 1], [1, 0]]
 
 def test_C3():
     crs = CRS("x", [("xxx", "")])
@@ -75,11 +59,7 @@ def test_C3():
     ]
     assert crs.essential_counts(4) == [1, 1, 1, 1, 1]
     assert crs.homology_list(3) == [{0: 1}, {3: 1}, {}, {3: 1}]
-    assert crs.op_table_with_map() == (
-        ["", "x", "xx"],
-        {"": 0, "x": 1, "xx": 2},
-        [[0, 1, 2], [1, 2, 0], [2, 0, 1]],
-    )
+    assert crs.op_table(["", "x", "xx"]) == [[0, 1, 2], [1, 2, 0], [2, 0, 1]]
 
 
 def test_left_zero():
@@ -89,11 +69,7 @@ def test_left_zero():
     assert crs.essentials == [tuple(product("xy", repeat=n)) for n in range(4+1)]
     assert crs.essential_counts(4) == [1, 2, 4, 8, 16]
     assert crs.homology_list(3) == [{0: 1}, {}, {}, {}]
-    assert crs.op_table_with_map() == (
-        ["", "x", "y"],
-        {"": 0, "x": 1, "y": 2},
-        [[0, 1, 2], [1, 1, 1], [2, 2, 2]],
-    )
+    assert crs.op_table(["", "x", "y"]) == [[0, 1, 2], [1, 1, 1], [2, 2, 2]]
 
 def test_right_zero():
     crs = CRS("xy", [("xx", "x"), ("xy", "y"), ("yx", "x"), ("yy", "y")])
@@ -102,26 +78,18 @@ def test_right_zero():
     assert crs.essentials == [tuple(product("xy", repeat=n)) for n in range(4+1)]
     assert crs.essential_counts(4) == [1, 2, 4, 8, 16]
     assert crs.homology_list(3) == [{0: 1}, {}, {}, {}]
-    assert crs.op_table_with_map() == (
-        ["", "x", "y"],
-        {"": 0, "x": 1, "y": 2},
-        [[0, 1, 2], [1, 1, 2], [2, 1, 2]],
-    )
+    assert crs.op_table(["", "x", "y"]) == [[0, 1, 2], [1, 1, 2], [2, 1, 2]]
 
 def test_CRS_rect22():
     crs = CRS("xy", [("xx", "x"), ("yy", "y"), ("xyx", "x"), ("yxy", "y")])
     assert crs.essential_counts(4) == [1, 2, 4, 8, 16]
     assert list(crs.elements()) == ["", "x", "y", "xy", "yx"]
     assert crs.homology_list(3) == [{0: 1}, {}, {0: 1}, {}]
-    assert crs.op_table_with_map() == (
-        ["", "x", "y", "xy", "yx"],
-        {"": 0, "x": 1, "y": 2, "xy": 3, "yx": 4},
-        [[0, 1,2,3,4], [1, 1,3,3,1], [2, 4,2,2,4], [3, 1,3,3,1], [4, 4,2,2,4]],
+    assert crs.op_table(["", "x", "y", "xy", "yx"]) == (
+        [[0, 1,2,3,4], [1, 1,3,3,1], [2, 4,2,2,4], [3, 1,3,3,1], [4, 4,2,2,4]]
     )
-    assert crs.op_table_with_map(["x", "xy", "yx", "y", ""]) == (
-        ["x", "xy", "yx", "y", ""],
-        {"x": 0, "xy": 1, "yx": 2, "y": 3, "": 4},
-        [[0,1,0,1, 0], [0,1,0,1, 1], [2,3,2,3, 2], [2,3,2,3, 3], [0,1,2,3, 4]],
+    assert crs.op_table(["x", "xy", "yx", "y", ""]) == (
+        [[0,1,0,1, 0], [0,1,0,1, 1], [2,3,2,3, 2], [2,3,2,3, 3], [0,1,2,3, 4]]
     )
 
 def test_rect22_with_C2_acting_on_both_sides():
@@ -139,9 +107,7 @@ def test_rect22_with_C2_acting_on_both_sides():
     ]
     assert crs.essential_counts(4) == [1, 2, 3, 5, 9]
     assert crs.homology_list(3) == [{0: 1}, {}, {0: 1}, {2: 1}]
-    assert crs.op_table_with_map(["x", "xg", "gx", "gxg", "", "g"]) == (
-        ["x", "xg", "gx", "gxg", "", "g"],
-        {"x": 0, "xg": 1, "gx": 2, "gxg": 3, "": 4, "g": 5},
+    assert crs.op_table(["x", "xg", "gx", "gxg", "", "g"]) == (
         [[0,1,0,1,0,1],
          [0,1,0,1,1,0],
          [2,3,2,3,2,3],

@@ -66,6 +66,9 @@ class CompleteRewritingSystem:
         self.operation_cache[a, b] = result
         return result
 
+    def __repr__(self):
+        return f"CRS({self.alphabet!r}, {self.rules})"
+
     def __init__(self, alphabet, rules, max_rewrites=1000):
         if len(set(alphabet)) != len(alphabet):
             raise ValueError("alphabet has duplicates")
@@ -174,15 +177,11 @@ class CompleteRewritingSystem:
             for a in alphabet:
                 q.append(self.reduce(x + a))
 
-    def op_table_with_map(self, elements=None):
-        if elements is None:
-            elements = list(self.elements())
-        else:
-            assert sorted(elements) == sorted(self.elements())
+    def op_table(self, elements):
         element_to_index = {x: i for i, x in enumerate(elements)}
         op = [[element_to_index[self.operation(x, y)] for y in elements]
               for x in elements]
-        return elements, element_to_index, op
+        return op
 
     def _classify_pair_internal(self, a, b):
         # Evaluate a pair of adjacent entries of a cell.

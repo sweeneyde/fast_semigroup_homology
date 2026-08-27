@@ -3,7 +3,7 @@ from collections import defaultdict
 from mutable_lattice import Vector
 
 from ..projective_resolution import ResolutionNode, ProjectiveResolution
-from .homology_with_generators import homology_with_generators
+from .homology_with_generators import homology
 
 class ResolutionWithBarComparison:
     """
@@ -140,7 +140,9 @@ class BarComparisonNode:
             incoming_tensor_action = Vector(incoming_tensor_action)
             for e_image in child.e_images:
                 incoming.append(e_image.shuffled_by_action(incoming_tensor_action, len(outgoing)))
-        invariants, generators = homology_with_generators(incoming, outgoing)
+        h = homology(incoming, outgoing)
+        generators = h.get_generators()
+        invariants = h.get_invariants()
         # Push forward to the bar resolution
         bar_generators = []
         for gen in generators:

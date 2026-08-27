@@ -8,12 +8,10 @@ from fast_semigroup_homology.cup_products.homology_with_generators import (
     _normalize_pair,
     _normalize_smith_with_coefficients,
     _smith_with_coefficients,
-    _cokernel_with_generators_unfiltered,
-    cokernel_with_generators,
+    _smith_with_right_coefficients,
     _inverse,
-    homology_with_generators,
-    cokernel_with_generators_and_projection,
-    homology_with_generators_and_projection,
+    Cokernel,
+    homology,
 )
 
 def test__inverse():
@@ -96,23 +94,76 @@ def test_smith_with_coefficients_random():
                 combos.append(v)
         assert Lattice(N, combos).nonzero_invariants() == nonzero_invariants
 
-def test_cokernel_with_generators():
-    assert cokernel_with_generators(0, []) == ([], [])
-    assert cokernel_with_generators(1, []) == ([0], [Vector([1])])
-    assert cokernel_with_generators(2, []) == ([0, 0], [Vector([1,0]), Vector([0,1])])
-    assert cokernel_with_generators(1, [Vector([1])]) == ([], [])
-    assert cokernel_with_generators(1, [Vector([-1])]) == ([], [])
-    assert cokernel_with_generators(1, [Vector([5])]) == ([5], [Vector([1])])
-    assert cokernel_with_generators(1, [Vector([-5])]) == ([5], [Vector([1])])
-    assert cokernel_with_generators(1, [Vector([0])]) == ([0], [Vector([1])])
-    assert cokernel_with_generators(1, [Vector([5]), Vector([5])]) == ([5], [Vector([1])])
-    assert cokernel_with_generators(2, [Vector([0,0])]) == ([0, 0], [Vector([1,0]),Vector([0,1])])
-    assert cokernel_with_generators(2, [Vector([1,0])]) == ([0], [Vector([0,1])])
-    assert cokernel_with_generators(2, [Vector([2,-1])]) == ([0], [Vector([1,0])])
-    assert cokernel_with_generators(2, [Vector([1,0]),Vector([2,2])]) == ([2], [Vector([0,1])])
-    assert cokernel_with_generators(2, [Vector([1,0]),Vector([2,2]),Vector([0,2])]) == ([2], [Vector([0,1])])
-    assert cokernel_with_generators(2, [Vector([2,0]),Vector([3,3])]) == ([6], [Vector([0,1])])
-    assert cokernel_with_generators(2, [Vector([-5,0]),Vector([5,4])]) == ([20], [Vector([-1,-1])])
+def test_cokernel_examples():
+    c = Cokernel(0, [])
+    assert c.get_generators() == []
+    assert c.get_invariants() == []
+    c = Cokernel(0, [Vector([])])
+    assert c.get_generators() == []
+    assert c.get_invariants() == []
+    c = Cokernel(0, [Vector([]), Vector([])])
+    assert c.get_generators() == []
+    assert c.get_invariants() == []
+
+    c = Cokernel(1, [])
+    assert c.get_generators() == [Vector([1])]
+    assert c.get_invariants() == [0]
+    c = Cokernel(1, [Vector([0])])
+    assert c.get_generators() == [Vector([1])]
+    assert c.get_invariants() == [0]
+    c = Cokernel(1, [Vector([1])])
+    assert c.get_generators() == []
+    assert c.get_invariants() == []
+    c = Cokernel(1, [Vector([-1])])
+    assert c.get_generators() == []
+    assert c.get_invariants() == []
+    c = Cokernel(1, [Vector([5])])
+    assert c.get_generators() == [Vector([1])]
+    assert c.get_invariants() == [5]
+    c = Cokernel(1, [Vector([-5])])
+    assert c.get_generators() == [Vector([1])]
+    assert c.get_invariants() == [5]
+
+    c = Cokernel(2, [])
+    assert c.get_generators() == [Vector([1, 0]), Vector([0, 1])]
+    assert c.get_invariants() == [0, 0]
+    c = Cokernel(2, [Vector([0, 0])])
+    assert c.get_generators() == [Vector([1, 0]), Vector([0, 1])]
+    assert c.get_invariants() == [0, 0]
+    c = Cokernel(2, [Vector([1, 0])])
+    assert c.get_generators() == [Vector([0, 1])]
+    assert c.get_invariants() == [0]
+    c = Cokernel(2, [Vector([2, -1])])
+    assert c.get_generators() == [Vector([1, 0])]
+    assert c.get_invariants() == [0]
+    c = Cokernel(2, [Vector([1, 0]),Vector([2, 2])])
+    assert c.get_generators() == [Vector([0, 1])]
+    assert c.get_invariants() == [2]
+    c = Cokernel(2, [Vector([1, 0]),Vector([2, 2]),Vector([0, 2])])
+    assert c.get_generators() == [Vector([0, 1])]
+    assert c.get_invariants() == [2]
+    c = Cokernel(2, [Vector([2, 0]),Vector([3, 3])])
+    assert c.get_generators() == [Vector([0, 1])]
+    assert c.get_invariants() == [6]
+    c = Cokernel(2, [Vector([-5, 0]),Vector([5, 4])])
+    assert c.get_generators() == [Vector([-1, -1])]
+    assert c.get_invariants() == [20]
+
+    c = Cokernel(3, [Vector([1,0,0]), Vector([0,0,1])])
+    assert c.get_invariants() == [0]
+    assert c.get_generators() == [Vector([0, 1, 0])]
+    assert c.projection(Vector([123, 456, 789])) == [456]
+
+    c = Cokernel(3, [Vector([1,0,0]), Vector([0, 100, 0]), Vector([0,0,1])])
+    assert c.get_invariants() == [100]
+    assert c.get_generators() == [Vector([0, 1, 0])]
+    assert c.projection(Vector([123, 456, 789])) == [56]
+
+    c = Cokernel(3, [Vector([0,2,2]), Vector([0,0,4])])
+    assert c.get_invariants() == [2, 4, 0]
+    assert c.get_generators() == [Vector([0, 1, 1]), Vector([0, 0, 1]), Vector([1, 0, 0])]
+    assert c.projection(Vector([2, 3, 5])) == [1, 2, 2]
+    assert c.projection(Vector([7, 7, 7])) == [1, 0, 7]
 
 def check_exponents(L, invariants, generators):
     BIG = 2520  # lcm(*range(1,11))
@@ -147,126 +198,101 @@ def check_exponents(L, invariants, generators):
              assert BIG*v not in L2
         L2.add_vector(v)
 
-def test_cokernel_with_generators_random():
+def test_cokernel_random():
     for N, R, _ in itertools.product(range(5), repeat=3):
         data = [Vector([random.randint(-10, 10) for _ in range(N)]) for _ in range(R)]
-        invariants, generators = _cokernel_with_generators_unfiltered(N, data)
+        c = Cokernel(N, data)
+        generators = c.get_generators()
+        invariants = c.get_invariants()
         L = Lattice(N, data)
-        assert invariants == L.nonzero_invariants() + [0] * (L.ambient_dimension - L.rank)
+        assert c.get_invariants() == [d for d in L.invariants() if d != 1]
         assert (L + Lattice(N, generators)).is_full()
         check_exponents(L, invariants, generators)
-
-def test_homology_with_generators():
-    assert homology_with_generators(
-        [Vector([0,0]), Vector([0,0]), Vector([0,0])],
-        [Vector([7,7,7,7]),Vector([0,0,5,5])]
-    ) == ([], [])
-    assert homology_with_generators(
-        [Vector([0,0])],
-        [Vector([7,7,7,7]),Vector([7,7,7,7])]
-    ) == ([0], [Vector([1,-1])])
-    assert homology_with_generators(
-        [Vector([0,0])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3])]
-    ) == ([0], [Vector([3,-2])])
-    assert homology_with_generators(
-        [Vector([0,0,0])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([0, 0], [Vector([3,-2, 0]), Vector([0, 0, 1])])
-    assert homology_with_generators(
-        [Vector([3,-2,0])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([0], [Vector([0, 0, 1])])
-    assert homology_with_generators(
-        [Vector([0,0,1])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([0], [Vector([3,-2,0])])
-    assert homology_with_generators(
-        [Vector([0,0,1]), Vector([3,-2,1])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([], [])
-    assert homology_with_generators(
-        [Vector([3,-2,-100])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([0], [Vector([0,0,1])])
-    assert homology_with_generators(
-        [Vector([-30,20,1])],
-        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
-    ) == ([0], [Vector([3,-2,0])])
-
-def test_homology_with_generators_random():
-    for K, N, R, _ in itertools.product(range(5), repeat=4):
-        outgoing = [Vector([random.randint(-10,10) for _ in range(K)])
-                    for _ in range(N)]
-        kernel = relations_among(outgoing)
-        incoming = [kernel.linear_combination(
-                        Vector([random.randint(-10,10)
-                                for _ in range(kernel.rank)]))
-                    for _ in range(R)]
-        invariants, generators = homology_with_generators(incoming, outgoing)
-        L = Lattice(N, incoming)
-        assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (kernel.rank - L.rank)
-        assert L + Lattice(N, generators) == kernel
-        check_exponents(L, invariants, generators)
-
-def test_cokernel_with_generators_and_projection():
-    invariants, generators, projection = cokernel_with_generators_and_projection(
-        3, [Vector([1,0,0]), Vector([0,0,1])])
-    assert invariants == [0]
-    assert generators == [Vector([0, 1, 0])]
-    assert projection(Vector([123, 456, 789])) == [456]
-
-    invariants, generators, projection = cokernel_with_generators_and_projection(
-        3, [Vector([1,0,0]), Vector([0, 100, 0]), Vector([0,0,1])])
-    assert invariants == [100]
-    assert generators == [Vector([0, 1, 0])]
-    assert projection(Vector([123, 456, 789])) == [56]
-
-    invariants, generators, projection = cokernel_with_generators_and_projection(
-        3, [Vector([0,2,2]), Vector([0,0,4])])
-    assert invariants == [2, 4, 0]
-    assert generators == [Vector([0, 1, 1]), Vector([0, 0, 1]), Vector([1, 0, 0])]
-    assert projection(Vector([2, 3, 5])) == [1, 2, 2]
-    assert projection(Vector([7, 7, 7])) == [1, 0, 7]
-
-def test_cokernel_with_generators_and_projection_random():
-    for N, R, _ in itertools.product(range(5), repeat=3):
-        data = [Vector([random.randint(-10, 10) for _ in range(N)]) for _ in range(R)]
-        invariants, generators, projection = cokernel_with_generators_and_projection(N, data)
-        L = Lattice(N, data)
-        assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (N - L.rank)
-        check_exponents(L, invariants, generators)
-        assert (L + Lattice(N, generators)).is_full()
         # projection after inclusion (retraction)
         for i, gen in enumerate(generators):
-            assert projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1), data
+            assert c.projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1), data
         # inclusion after projection agrees up to L elements
         zero = Vector.zero(N)
         for v in data:
-            v1 = sum((x*gen for x, gen in zip(projection(v), generators)), start=zero)
+            v1 = sum((x*gen for x, gen in zip(c.projection(v), generators)), start=zero)
             assert v1 - v in L
 
-def test_homology_with_generators_and_projection():
-    invariants, generators, projection = homology_with_generators_and_projection(
+def test_homology_examples():
+    h = homology(
+        [Vector([0,0]), Vector([0,0]), Vector([0,0])],
+        [Vector([7,7,7,7]),Vector([0,0,5,5])]
+    )
+    assert h.get_generators() == []
+    assert h.get_invariants() == []
+    h = homology(
         [Vector([0,0])],
         [Vector([7,7,7,7]),Vector([7,7,7,7])]
     )
-    assert invariants == [0]
-    assert generators == [Vector([1, -1])]
-    assert projection(Vector([2,-2])) == [2]
-
-    invariants, generators, projection = homology_with_generators_and_projection(
+    assert h.get_generators() == [Vector([1,-1])]
+    assert h.get_invariants() == [0]
+    h = homology(
+        [Vector([0,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3])]
+    )
+    assert h.get_generators() == [Vector([3,-2])]
+    assert h.get_invariants() == [0]
+    h = homology(
+        [Vector([0,0,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_generators() == [Vector([3,-2, 0]), Vector([0, 0, 1])]
+    assert h.get_invariants() == [0, 0]
+    h = homology(
         [Vector([3,-2,0])],
         [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
     )
-    assert invariants == [0]
-    assert generators == [Vector([0, 0, 1])]
-    assert projection(Vector([0, 0, 1])) == [1]
-    assert projection(Vector([3, -2, 1])) == [1]
-    assert projection(Vector([300, -200, 17])) == [17]
+    assert h.get_generators() == [Vector([0, 0, 1])]
+    assert h.get_invariants() == [0]
+    h = homology(
+        [Vector([0,0,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_generators() == [Vector([3,-2,0])]
+    assert h.get_invariants() == [0]
+    h = homology(
+        [Vector([0,0,1]), Vector([3,-2,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_generators() == []
+    assert h.get_invariants() == []
+    h = homology(
+        [Vector([3,-2,-100])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_generators() == [Vector([0,0,1])]
+    assert h.get_invariants() == [0]
+    h = homology(
+        [Vector([-30,20,1])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_generators() == [Vector([3,-2,0])]
+    assert h.get_invariants() == [0]
+
+    h = homology(
+        [Vector([0,0])],
+        [Vector([7,7,7,7]),Vector([7,7,7,7])]
+    )
+    assert h.get_invariants() == [0]
+    assert h.get_generators() == [Vector([1, -1])]
+    assert h.projection(Vector([2,-2])) == [2]
+
+    h = homology(
+        [Vector([3,-2,0])],
+        [Vector([2,2,2,2]),Vector([3,3,3,3]),Vector([0,0,0,0])]
+    )
+    assert h.get_invariants() == [0]
+    assert h.get_generators() == [Vector([0, 0, 1])]
+    assert h.projection(Vector([0, 0, 1])) == [1]
+    assert h.projection(Vector([3, -2, 1])) == [1]
+    assert h.projection(Vector([300, -200, 17])) == [17]
 
 
-def test_homology_with_generators_and_projection_random():
+def test_homology_random():
     for K, N, R, _ in itertools.product(range(5), repeat=4):
         outgoing = [Vector([random.randint(-10,10) for _ in range(K)])
                     for _ in range(N)]
@@ -275,16 +301,18 @@ def test_homology_with_generators_and_projection_random():
                         Vector([random.randint(-10,10)
                                 for _ in range(kernel.rank)]))
                     for _ in range(R)]
-        invariants, generators, projection = homology_with_generators_and_projection(incoming, outgoing)
+        h = homology(incoming, outgoing)
+        generators = h.get_generators()
+        invariants = h.get_invariants()
         L = Lattice(N, incoming)
-        assert invariants == [d for d in L.nonzero_invariants() if d != 1] + [0] * (kernel.rank - L.rank)
+        assert h.get_invariants() == [d for d in L.nonzero_invariants() if d != 1] + [0] * (kernel.rank - L.rank)
         assert L + Lattice(N, generators) == kernel
         check_exponents(L, invariants, generators)
         # projection after inclusion (retraction)
         for i, gen in enumerate(generators):
-            assert projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1)
+            assert h.projection(gen) == [0] * i + [1] + [0] * (len(generators)-i-1)
         # inclusion after projection agrees up to L elements
         zero = Vector.zero(N)
         for v in incoming:
-            v1 = sum((x*gen for x, gen in zip(projection(v), generators)), start=zero)
+            v1 = sum((x*gen for x, gen in zip(h.projection(v), generators)), start=zero)
             assert v1 - v in L

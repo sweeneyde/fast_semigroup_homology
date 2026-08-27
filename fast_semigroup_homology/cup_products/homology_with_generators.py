@@ -105,76 +105,120 @@ def _smith_with_coefficients(N, vectors):
 
     Given a matrix A of row vectors, apply row operations to [A | id],
     along with column operations to A only, to get a matrix [D | S],
-    where D=S*A*T is in SNF, T (not provided) is the matrix of column operations used.
+    where D=S*A*T is in SNF, and T (not provided) is the matrix of column operations used.
     Return the diagonal entries of D, along with the row vectors of S.
     """
     invariants, coefficient_vectors = _smith_with_coefficients_unnormalized(N, vectors)
     return _normalize_smith_with_coefficients(invariants, coefficient_vectors)
 
-def _cokernel_with_generators_unfiltered(N, vectors):
+def _smith_with_right_coefficients(N, vectors):
+    """Find the SNF of a matrix, along with the matrix of column operations used.
+
+    Given a matrix A of row vectors, apply row operation matrix S
+    and column operation matrix T such that D=S*A*T is in SNF.
+    Return the diagonal entries of D, along with the row vectors of T.
     """
-    Given vectors in Z^N, produce Z^N/(Z-span of vectors) as
-    a list of cyclic summands (invariant factors), along with a vector in Z^N
-    representing each cyclic summand. Include trivial summands Z/1.
-    """
-    vectors = _hnf(vectors)
-    R = len(vectors)
     columns = transpose(N, vectors)
-    invariants, column_coefficient_vectors = _smith_with_coefficients(R, columns)
-    generators = _inverse(transpose(N, column_coefficient_vectors))
-    return invariants, generators
-
-def cokernel_with_generators(N, vectors):
-    """
-    Given vectors in Z^N, produce Z^N/(Z-span of vectors) as
-    a list of cyclic summands (invariant factors), along with a vector in Z^N
-    representing each cyclic summand. Do NOT include trivial summands Z/1.
-    """
-    invariants, generators = _cokernel_with_generators_unfiltered(N, vectors)
-    ones = sum(1 for d in invariants if d == 1)
-    assert invariants[:ones] == [1] * ones
-    return invariants[ones:], generators[ones:]
-
-def homology_with_generators(incoming, outgoing):
-    """Compute the homology at Z^R ---> Z^N ---> Z^K.
-
-    `incoming` is a list of length R specifying the image in Z^N of each basis element of Z^R.
-    `outgoing` is likewise a list of length N of vectors of length K.
-    """
-    kernel = relations_among(outgoing)
-    relative = list(map(kernel.coefficients_of, incoming))
-    invariants, rel_generators = cokernel_with_generators(kernel.rank, relative)
-    generators = list(map(kernel.linear_combination, rel_generators))
-    return invariants, generators
-
-def cokernel_with_generators_and_projection(N, vectors):
-    vectors = _hnf(vectors)
     R = len(vectors)
-    columns = transpose(N, vectors)
-    invariants, column_coefficient_vectors = _smith_with_coefficients(R, columns)
-    ones = sum(1 for d in invariants if d == 1)
-    assert invariants[:ones] == [1] * ones
-    standard_basis_to_nontrivial_generator_coeffs = transpose(N, column_coefficient_vectors[ones:])
-    generators = _inverse(transpose(N, column_coefficient_vectors))
-    def projection(v):
-        if len(v) != N:
-            raise ValueError(f"expected len(v)={N}, but got {len(v)=}")
-        result = Vector.zero(N - ones)
-        for vi, gen_coeffs_i in zip(v, standard_basis_to_nontrivial_generator_coeffs):
+    invariants, coeff = _smith_with_coefficients(R, columns)
+    return invariants, transpose(len(coeff), coeff)
+
+class Cokernel:
+    """Represent a quotient group Z^N/vectors"""
+    __slots__ = [
+        # The ambient dimension our vectors live in
+        "N",
+        # The vectors we're quotienting by, as HNF
+        "vectors",
+        # The invariants for the Z/d summands, including 0s (Z summands),
+        #     but not 1s (trivial summands)
+        "_invariants",
+        # The generators of Z^N that get mapped to to the generators
+        #     of the cyclic summand Z/d of Z^N/vectors
+        "_generators",
+        # The transposed invertible matrix T such that S(vectors)T = D is in Smith normal form.
+        "_smith_T",
+        # The image of each standard basis vector in the nontrivial summands
+        "_standard_basis_to_nontrivial",
+    ]
+
+    def __init__(self, N : int, vectors : list[Vector]):
+        self.N = N
+        self.vectors = _hnf(vectors)
+        self._invariants = None
+        self._smith_T = None
+        self._generators = None
+        self._standard_basis_to_nontrivial = None
+
+    def get_invariants(self) -> list[int]:
+        """
+        Get the invariants for the Z/d summands in this quotient,
+        including 0s (Z summands), but not 1s (trivial summands).
+        """
+        if self._invariants is None:
+            L = Lattice(self.N, self.vectors, maxrank=len(self.vectors))
+            self._invariants = [d for d in L.invariants() if d != 1]
+        return self._invariants
+
+    def get_smith_T(self) -> list[Vector]:
+        """
+        Get the invertible matrix T such that S(vectors)T = D is in SNF.
+        """
+        if self._smith_T is None:
+            all_invariants, smith_T = _smith_with_right_coefficients(self.N, self.vectors)
+            invariants = [d for d in all_invariants if d != 1]
+            if self._invariants is not None:
+                assert self._invariants == invariants
+            self._invariants = invariants
+            self._smith_T = smith_T
+        return self._smith_T
+
+    def get_generators(self) -> list[Vector]:
+        if self._generators is None:
+            V = _inverse(self.get_smith_T())
+            num_ones = self.N - len(self._invariants)
+            self._generators = V[num_ones:]
+        return self._generators
+
+    def get_standard_basis_to_nontrivial(self) -> list[Vector]:
+        if self._standard_basis_to_nontrivial is None:
+            T = self.get_smith_T()
+            num_ones = self.N - len(self._invariants)
+            T_slice = transpose(self.N, transpose(self.N, T)[num_ones:])
+            self._standard_basis_to_nontrivial = T_slice
+        return self._standard_basis_to_nontrivial
+
+    def projection(self, v : Vector) -> list[int]:
+        s2nontrivial = self.get_standard_basis_to_nontrivial()
+        invariants = self.get_invariants()
+        result = Vector.zero(len(invariants))
+        for vi, gen_coeffs_i in zip(v, s2nontrivial, strict=True):
             result += vi * gen_coeffs_i
-        return [x % d if d else x for (x, d) in zip(result, invariants[ones:], strict=True)]
-    return invariants[ones:], generators[ones:], projection
+        return [x % d if d else x for x, d in zip(result, invariants, strict=True)]
 
-def homology_with_generators_and_projection(incoming, outgoing):
+class SubQuotient:
+    __slots__ = ["L", "relative_coker", "_generators"]
+    def __init__(self, L, vectors):
+        self.L = L
+        self.relative_coker = Cokernel(L.rank, list(map(L.coefficients_of, vectors)))
+        self._generators = None
+
+    def get_generators(self):
+        if self._generators is None:
+            relative_generators = self.relative_coker.get_generators()
+            self._generators = list(map(self.L.linear_combination, relative_generators))
+        return self._generators
+
+    def get_invariants(self):
+        return self.relative_coker.get_invariants()
+
+    def projection(self, v):
+        return self.relative_coker.projection(self.L.coefficients_of(v))
+
+def homology(incoming, outgoing):
     """Compute the homology at Z^R ---> Z^N ---> Z^K.
 
     `incoming` is a list of length R specifying the image in Z^N of each basis element of Z^R.
     `outgoing` is likewise a list of length N of vectors of length K.
     """
-    kernel = relations_among(outgoing)
-    relative = list(map(kernel.coefficients_of, incoming))
-    invariants, rel_generators, rel_projection = cokernel_with_generators_and_projection(kernel.rank, relative)
-    generators = list(map(kernel.linear_combination, rel_generators))
-    def projection(v):
-        return rel_projection(kernel.coefficients_of(v))
-    return invariants, generators, projection
+    return SubQuotient(relations_among(outgoing), incoming)

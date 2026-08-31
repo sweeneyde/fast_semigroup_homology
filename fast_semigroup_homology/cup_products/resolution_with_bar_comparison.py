@@ -1,9 +1,9 @@
 from collections import defaultdict
 
-from mutable_lattice import Vector
+from mutable_lattice import Vector, Lattice, relations_among, transpose
 
 from ..projective_resolution import ResolutionNode, ProjectiveResolution
-from .homology_with_generators import homology
+from .homology_with_generators import homology, SubQuotient
 
 class ResolutionWithBarComparison:
     """
@@ -44,6 +44,86 @@ class ResolutionWithBarComparison:
                     results.append(bar_gen)
         return results
 
+    def mapping_and_cohomology(self, dim):
+        # TODO: We might take advantage of the BarComparisonNode decomposition.
+        #   This is a bit tricky though because Z/2 + Z/3 from different
+        #   parts ought to be combined into a Z/6.
+        images = []
+        kernels = []
+        N_ins = []
+        N_outs = []
+        e_images_in_bar = []
+        self.extend_to_dimension(dim + 1)
+        for comp_node in self.nodes_by_dimension[dim]:
+            N_in, incoming = comp_node.get_outgoing_tensored_matrix()
+            N_in, incoming = len(incoming), transpose(N_in, incoming)
+            N_out, outgoing = comp_node.get_incoming_tensored_matrix()
+            N_out, outgoing = len(outgoing), transpose(N_out, outgoing)
+            assert len(outgoing) == N_in
+            image = Lattice(N_in, incoming, maxrank=len(incoming))
+            kernel = relations_among(outgoing)
+            # if image == kernel:
+            #     continue
+            images.append(image)
+            kernels.append(kernel)
+            N_ins.append(N_in)
+            N_outs.append(N_out)
+            e_images_in_bar.extend(comp_node.e_images_in_bar)
+        N = sum(N_ins)
+        offset = 0
+        big_kernel = []
+        big_image = []
+        for ker, im in zip(kernels, images):
+            sub_N = ker.ambient_dimension
+            assert im.ambient_dimension == sub_N
+            column_action = Vector(list(range(offset, offset + sub_N)))
+            for k in ker.get_basis():
+                big_kernel.append(k.shuffled_by_action(column_action, N))
+            for v in im.get_basis():
+                big_image.append(v.shuffled_by_action(column_action, N))                
+            offset += sub_N
+        assert offset == N
+        L = Lattice(N, big_kernel, maxrank=len(big_kernel))
+        h = SubQuotient(L, big_image)
+        return e_images_in_bar, h
+
+    def cohomology_with_bar_projection(self, dim):
+        e_images_in_bar, h = self.mapping_and_cohomology(dim)
+        def bar_projection(cochain: dict[tuple[int], int]):
+            # f*(dual(x1|...|xn)) (basis vector ei of Z^N)
+            #     = dual(x1|...|xn)(f(ei))
+            #     = how many (x1|...|xn) show up in f(ei),
+            #   where f(ei) are the bar_images
+            v = Vector([
+                sum(
+                    e_image[tup] * cochain[tup]
+                    for tup in e_image.keys() & cochain.keys()
+                )
+                for e_image in e_images_in_bar
+            ])
+            return h.projection(v)
+        # "prime the pump" so the invariants come for free
+        bar_projection({})
+        invariants = h.get_invariants()
+        return invariants, bar_projection
+
+    def cohomology_with_bar_cup_projection(self, dim):
+        e_images_in_bar, h = self.mapping_and_cohomology(dim)
+        def bar_cup_projection(a, b, cochain_a, cochain_b):
+            assert a + b == dim
+            v = Vector([
+                sum(
+                    val * cochain_a.get(tup[0:a], 0) * cochain_b.get(tup[a:a+b], 0)
+                    for tup, val in e_image.items()
+                )
+                for e_image in e_images_in_bar
+            ])
+            return h.projection(v)
+        # "prime the pump" so the invariants come for free
+        bar_cup_projection(0, dim, {}, {})
+        invariants = h.get_invariants()
+        return invariants, bar_cup_projection
+
 class BarComparisonNode:
     """
     Represent a map from a ResolutionNode to the bar resolution.
@@ -52,7 +132,7 @@ class BarComparisonNode:
         # A ResolutionNode we're mapping out of
         "base_node",
         # Each summand's identity gets mapped to some 1[x1|...|xn] in the bar res.
-        # We store a list[tuple[int]], with entries (x1,...,xn).
+        # We store a list[dict[tuple[int], int]], with entries (x1,...,xn).
         # If the generator e is not the identity, then technically we map to e[x1|...|xn],
         # but we're only going to store the (x1,...,xn).
         "e_images_in_bar",
@@ -118,19 +198,9 @@ class BarComparisonNode:
 
         self.e_images_in_bar = e_images_in_bar
 
-    def homology_with_generators_in_bar(self):
-        # To tensor a map, identify together each ZSe summand together to a single Z.
+    def get_incoming_tensored_matrix(self):
+        N = len(self.base_node.e_images)
         e_to_Se = self.base_node.resolution.e_to_Se
-        if self.prev is None:
-            # Delete the augmentation map while tensoring
-            outgoing = [Vector([]) for _ in self.base_node.e_images]
-        else:
-            outgoing_tensor_action = []
-            for i, e in enumerate(self.base_node.prev_module):
-                outgoing_tensor_action.extend([i] * len(e_to_Se[e]))
-            outgoing_tensor_action = Vector(outgoing_tensor_action)
-            outgoing = [e_image.shuffled_by_action(outgoing_tensor_action, len(self.base_node.prev_module))
-                        for e_image in self.base_node.e_images]
         incoming = []
         for child, gen_indexes in zip(self.base_node.get_children(),
                                       self.base_node.child_gen_indexes, strict=True):
@@ -139,7 +209,26 @@ class BarComparisonNode:
                 incoming_tensor_action.extend([gi] * len(e_to_Se[e]))
             incoming_tensor_action = Vector(incoming_tensor_action)
             for e_image in child.e_images:
-                incoming.append(e_image.shuffled_by_action(incoming_tensor_action, len(outgoing)))
+                incoming.append(e_image.shuffled_by_action(incoming_tensor_action, N))
+        return N, incoming
+
+    def get_outgoing_tensored_matrix(self):
+        if self.prev is None:
+            return 0, [Vector([]) for _ in self.base_node.e_images]
+        e_to_Se = self.base_node.resolution.e_to_Se
+        outgoing_tensor_action = []
+        for i, e in enumerate(self.base_node.prev_module):
+            outgoing_tensor_action.extend([i] * len(e_to_Se[e]))
+        outgoing_tensor_action = Vector(outgoing_tensor_action)
+        N = len(self.base_node.prev_module)
+        outgoing = [e_image.shuffled_by_action(outgoing_tensor_action, N)
+                    for e_image in self.base_node.e_images]
+        return N, outgoing
+
+    def homology_with_generators_in_bar(self):
+        # To tensor a map, identify together each ZSe summand together to a single Z.
+        _, incoming = self.get_incoming_tensored_matrix()
+        _, outgoing = self.get_outgoing_tensored_matrix()
         h = homology(incoming, outgoing)
         generators = h.get_generators()
         invariants = h.get_invariants()
@@ -157,3 +246,4 @@ class BarComparisonNode:
                 if count
             })
         return invariants, bar_generators
+

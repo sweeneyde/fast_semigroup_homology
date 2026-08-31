@@ -197,6 +197,7 @@ class Cokernel:
         return [x % d if d else x for x, d in zip(result, invariants, strict=True)]
 
 class SubQuotient:
+    """Represent a quotient of a sublattice of Z^N by some subset of it"""
     __slots__ = ["L", "relative_coker", "_generators"]
     def __init__(self, L, vectors):
         self.L = L

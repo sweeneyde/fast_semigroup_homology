@@ -55,6 +55,17 @@ def test_rect22():
     assert res.homology_freepart_generators_in_bar(5) == []
     assert res.homology_freepart_generators_in_bar(6) == []
 
+    invariants, bar_projection = res.cohomology_with_bar_projection(0)
+    assert invariants == [0]
+    assert bar_projection({(): 100}) == [100]
+    invariants, bar_projection = res.cohomology_with_bar_projection(1)
+    assert invariants == []
+    assert bar_projection({}) == []
+    assert bar_projection({(4,): 100}) == []
+    invariants, bar_projection = res.cohomology_with_bar_projection(2)
+    assert invariants == [0]
+    assert bar_projection({(0, 0): 1, (0, 1): 1, (2, 0): 1, (2, 1): 1}) == [1]
+
 def test_C2():
     op = [[0, 1], [1, 0]]
     res = ResolutionWithBarComparison(op)
@@ -82,3 +93,24 @@ def test_C2():
     assert res.homology_freepart_generators_in_bar(5) == []
     assert res.homology_freepart_generators_in_bar(7) == []
 
+    invariants, bar_projection = res.cohomology_with_bar_projection(0)
+    assert invariants == [0]
+    assert bar_projection({}) == [0]
+    assert bar_projection({(): 1}) == [1]
+    assert bar_projection({(): 100}) == [100]
+    invariants, bar_projection = res.cohomology_with_bar_projection(1)
+    assert invariants == []
+    assert bar_projection({}) == []
+    assert bar_projection({(0,): 1}) == []
+    invariants, bar_projection = res.cohomology_with_bar_projection(2)
+    assert invariants == [2]
+    assert bar_projection({(0,0): 1}) == [0]
+    assert bar_projection({(0,1): 1}) == [0]
+    assert bar_projection({(0,1): 1}) == [0]
+    assert bar_projection({(1,1): 1}) == [1]
+    invariants, bar_projection = res.cohomology_with_bar_projection(3)
+    assert invariants == []
+    # assert bar_projection({(1,1,1): 1}) == [0]
+    invariants, bar_projection = res.cohomology_with_bar_projection(4)
+    assert invariants == [2]
+    assert bar_projection({(1,1,1,1): 1}) == [1]

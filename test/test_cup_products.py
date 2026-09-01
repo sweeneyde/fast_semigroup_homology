@@ -16,16 +16,27 @@ def test_fast_C2():
             assert cup_product_matrix(C2, a, b) == ([2], [2], [2], [[[1]]])
 
 def test_fast_C3():
-    C2 = [[0,1,2],[1,2,0],[2,0,1]]
-    assert cup_product_matrix(C2, 0, 0) == ([0], [0], [0], [[[1]]])
-    assert cup_product_matrix(C2, 0, 2) == ([0], [3], [3], [[[1]]])
-    assert cup_product_matrix(C2, 2, 2) == ([3], [3], [3], [[[1]]])
+    C3 = [[0,1,2],[1,2,0],[2,0,1]]
+    assert cup_product_matrix(C3, 0, 0) == ([0], [0], [0], [[[1]]])
+    assert cup_product_matrix(C3, 0, 2) == ([0], [3], [3], [[[1]]])
+    assert cup_product_matrix(C3, 2, 2) == ([3], [3], [3], [[[1]]])
     for a in [2, 4, 6, 8, 10]:
-        assert cup_product_matrix(C2, 0, a) == ([0], [3], [3], [[[1]]])
-        assert cup_product_matrix(C2, a, 0) == ([3], [0], [3], [[[1]]])
+        assert cup_product_matrix(C3, 0, a) == ([0], [3], [3], [[[1]]])
+        assert cup_product_matrix(C3, a, 0) == ([3], [0], [3], [[[1]]])
         for b in [2, 4, 6, 8, 10]:
-            assert cup_product_matrix(C2, a, b) == ([3], [3], [3], [[[1]]])
+            assert cup_product_matrix(C3, a, b) == ([3], [3], [3], [[[1]]])
 
+def test_fast_V4():
+    V4 = [[i^j for j in range(4)] for i in range(4)]
+    H2a, H2b, H4, mat = cup_product_matrix(V4, 2, 2)
+    assert H2a == H2b == [2, 2]
+    assert H4 == [2, 2, 2]
+    assert mat[1][0] == mat[0][1]
+    a, b, c = mat[0][0], mat[0][1], mat[1][1]
+    # linearly independent over Z/2
+    assert c != [x^y for x, y in zip(a, b)]
+    assert any(a) and any(b) and any(c)
+    assert a != b and a != c and b != c
 
 def test_bar_C2():
     C2 = [[0,1],[1,0]]
@@ -151,8 +162,6 @@ def test_rect22_adjoin_C2_trivially():
     # assert cup_product_matrix(op, 2, 10) == ([0], [2], [2], [[[0]]])
     # assert cup_product_matrix(op, 4, 8) == ([2], [2], [2], [[[0]]])
     # assert cup_product_matrix(op, 6, 6) == ([2], [2], [2], [[[0]]])
-
-
 
 def test_C2():
     res = BarComplex([[0,1],[1,0]])

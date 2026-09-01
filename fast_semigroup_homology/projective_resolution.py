@@ -261,7 +261,7 @@ class ProjectiveResolution:
         return [invariant_factors(homology_with_shift[self.root, dim])
                 for dim in range(maxdim + 1)]
 
-    def has_trivial_homology(self, right_S_set_action=None, check=True):
+    def has_trivial_homology(self, right_S_set_action=None, check=True, limit=None):
         right_S_set_action, e_to_Xe, e_to_x_to_ii = self.prepare_right_S_set_for_tensoring(right_S_set_action, check=check)
 
         @cache
@@ -283,6 +283,16 @@ class ProjectiveResolution:
             node = q.popleft()
             if node not in done:
                 done.add(node)
+                if limit is not None:
+                    if len(node.module) > limit:
+                        return False
+                    if len(done) > limit:
+                        print("too many nodes")
+                        return False
+                    for e_image in node.e_images:
+                        if max(map(int.bit_length, e_image)) > limit:
+                            print("ints too large")
+                            return False
                 if homology(node):
                     return False
                 q.extend(node.get_children())

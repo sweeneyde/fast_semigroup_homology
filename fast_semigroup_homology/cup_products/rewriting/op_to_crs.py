@@ -64,17 +64,24 @@ def generate_crs_alternatives_with_generators(op, gens, perms_per_combo):
         rep = representation_by_generators(op, gens1)
         for gens2 in orders:
             elements, crs = crs_from_representation(op, gens2, rep)
-            print(gens, gens1, gens2, "-->", crs.essential_counts(5))
+            # print(gens, gens1, gens2, "-->", crs.essential_counts(5))
             yield elements, crs
 
-def generate_crs_alternatives(op, max_generators, max_combos, perms_per_combo):
+def find_best_gens_crs(op, maxdim=5, *,
+                       max_generators=None,
+                       max_combos=None,
+                       perms_per_combo=1,
+                       early_exit=True
+                       ):
     n = len(op)
     if max_generators is None:
         max_generators = n - 1
     rn = range(n)
     [identity] = [e for e in rn if all(op[e][x] == x == op[x][e] for x in rn)]
     non_identity = sorted(set(rn) - {identity})
+    best_crs, best_elements, best_cost = None, None, None
     for k in range(max_generators + 1):
+        more_generators_helped = False
         if max_combos is None or comb(len(non_identity), k) <= max_combos:
             it = combinations(non_identity, k)
         else:
@@ -84,12 +91,13 @@ def generate_crs_alternatives(op, max_generators, max_combos, perms_per_combo):
             rep = representation_by_generators(op, gens)
             if None in rep:
                 continue
-            yield from generate_crs_alternatives_with_generators(op, gens, perms_per_combo)
-
-def find_best_gens_crs(op, maxdim=5, *, max_generators=None, max_combos=None, perms_per_combo=1):
-    def cost(elements_crs):
-        _, crs = elements_crs
-        return max(crs.essential_counts(maxdim))
-    elements, crs = min(generate_crs_alternatives(op, max_generators, max_combos, perms_per_combo), key=cost)
-    elements = list(map(crs.reduce, elements))
-    return elements, crs
+            for elements, crs in generate_crs_alternatives_with_generators(op, gens, perms_per_combo):
+                cost = max(crs.essential_counts(maxdim))
+                if best_crs is None or cost < best_cost:
+                    best_crs, best_elements, best_cost = crs, elements, cost
+                    more_generators_helped = True
+        if early_exit and best_crs is not None and not more_generators_helped:
+            return best_elements, best_crs
+    if best_crs is None:
+        raise ValueError("Could not find CRS")
+    return best_elements, best_crs

@@ -261,6 +261,12 @@ class ProjectiveResolution:
         return [invariant_factors(homology_with_shift[self.root, dim])
                 for dim in range(maxdim + 1)]
 
+    def cohomology_list(self, maxdim):
+        h = self.homology_list(maxdim)
+        return [{d:count for d, count in h[i].items() if d == 0}
+                | {d:count for d, count in h[i-1].items() if d and i >= 1}
+                for i in range(maxdim + 1)]
+
     def has_trivial_homology(self, right_S_set_action=None, check=True, limit=None):
         right_S_set_action, e_to_Xe, e_to_x_to_ii = self.prepare_right_S_set_for_tensoring(right_S_set_action, check=check)
 

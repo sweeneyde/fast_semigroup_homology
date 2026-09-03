@@ -93,11 +93,6 @@ class BarComplex:
         self.cached_cohomology[dim] = result
         return result
 
-    def cohomology_freepart_with_generators(self, dim):
-        invariants, bar_gens = self.cohomology_with_generators(dim)
-        ones = sum(1 for d in invariants if d == 1)
-        return bar_gens[ones:]
-
     def cohomology_with_generators_and_projection(self, dim):
         incoming = self.coboundary_matrix(dim - 1)
         outgoing = self.coboundary_matrix(dim)
@@ -111,7 +106,7 @@ class BarComplex:
                     for gen in generators]
         return invariants, bar_gens, h.projection
 
-    def cup_product_matrix(self, a, b):
+    def cup_product_invariants_and_matrix(self, a, b):
         a_invariants, a_gens = self.cohomology_with_generators(a)
         b_invariants, b_gens = self.cohomology_with_generators(b)
         ab_invariants, ab_gens, ab_projection = self.cohomology_with_generators_and_projection(a + b)

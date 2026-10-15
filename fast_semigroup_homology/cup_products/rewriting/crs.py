@@ -10,45 +10,44 @@ Implement the "collapsing scheme" defined by
 for the nerve of a monoid with a complete rewriting system.
 """
 
-
-from collections import Counter, defaultdict, deque
-from itertools import permutations
+from collections import defaultdict, Counter, deque
 from enum import Enum
+from itertools import permutations
 
 from mutable_lattice import Vector, Lattice, transpose
+
 from ..homology_with_generators import homology
 
-class CellType(Enum):
+class CellKind(Enum):
     DEGENERATE = 0
     ESSENTIAL = 1
     REDUNDANT = 2
     COLLAPSIBLE = 3
 
-DEGENERATE = CellType.DEGENERATE
-ESSENTIAL = CellType.ESSENTIAL
-REDUNDANT = CellType.REDUNDANT
-COLLAPSIBLE = CellType.COLLAPSIBLE
+DEGENERATE, ESSENTIAL, REDUNDANT, COLLAPSIBLE = CellKind
 
 class CompleteRewritingSystem:
-
     __slots__ = [
         "alphabet",
         "rules",
         "max_rewrites",
-        "essentials",
-        "successor_words",
-        "operation_cache",
-        "classify_pair_cache",
-        "essential_representation_cache",
-        "coboundary_matrix_cache",
-        "cohomology_cache",
+        "_interned",
+        "_operation_cache",
+        "_successor_words",
+        "_essentials",
+        "_classify_pair_cache",
+        "_coboundary_matrix_cache",
+        "_cohomology_cache",
     ]
+
+    def intern(self, word):
+        return self._interned.setdefault(word, word)
 
     def reduce(self, word):
         word0 = word
         for _ in range(self.max_rewrites + 1):
             old = word
-            for left, right in self.rules:
+            for left, right in self.rules.items():
                 word = word.replace(left, right)
             if word == old:
                 return word
@@ -57,111 +56,118 @@ class CompleteRewritingSystem:
                            f"Stopped at {word!r}")
 
     def reducible(self, word):
-        return any(left in word for left, _ in self.rules)
+        return any(left in word for left in self.rules.keys())
 
     def irreducible(self, word):
         return not self.reducible(word)
 
     def operation(self, a, b):
-        if (cached := self.operation_cache.get((a, b))) is not None:
+        ca = self._operation_cache[a]
+        if (cached := ca.get(b)) is not None:
             return cached
-        result = self.reduce(a + b)
-        self.operation_cache[a, b] = result
+        result = self.intern(self.reduce(a + b))
+        ca[b] = result
         return result
 
     def __repr__(self):
         return f"CRS({self.alphabet!r}, {self.rules})"
 
-    def __init__(self, alphabet, rules, max_rewrites=1000):
-        if len(set(alphabet)) != len(alphabet):
-            raise ValueError("alphabet has duplicates")
-        self.alphabet = "".join(alphabet)
-        self.rules = tuple(rules)
+    def __init__(self,
+                 alphabet : str,
+                 rules : dict[str, str],
+                 max_rewrites=1000):
+        alphabet = "".join(alphabet)
+        rules = rules.copy()
+        self.alphabet = alphabet
+        self.rules = rules
         self.max_rewrites = max_rewrites
-        # Assert we're provided correct arguments
-        for left, right in rules:
+
+        for left, right in rules.items():
             if not isinstance(left, str) or not isinstance(right, str):
-                raise ValueError("Rules must be a list of pairs of strings")
+                raise ValueError("Rules must be dict[str,str]")
         set_alphabet = set(alphabet)
         if len(set_alphabet) != len(alphabet):
             raise ValueError("duplicate letters in alphabet")
-        letters = {c for rule in rules for side in rule for c in side}
+        letters = {c for rule in rules.items() for side in rule for c in side}
         if not (letters <= set_alphabet):
             raise ValueError(f"{letters - set_alphabet} not in alphabet")
-        for _, right in rules:
-            for left, _ in rules:
+        for right in rules.values():
+            for left in rules.keys():
                 if left in right:
                     raise ValueError(f"left side {left!r} "
                                      f"contains right side {right!r}")
-        for (left1, _), (left2, _) in permutations(rules, 2):
+        for left1, left2 in permutations(rules.keys(), 2):
             if left1 in left2:
                 raise ValueError(f"left side {left2!r} "
                                  f"contains left side {left1!r}")
-        for left, _ in rules:
+        for left in rules.keys():
             if len(left) <= 1:
                 raise ValueError(f"left side {left!r} is too small")
+
+        self._interned = {}
+
         # Collect proper nonempty prefixes/suffixes
-        prefix_to_rules = defaultdict(list)
-        suffix_to_rules = defaultdict(list)
-        for left, right in rules:
+        pre_suf_to_right = defaultdict(dict)
+        suf_pre_to_right = defaultdict(dict)
+        for left, right in rules.items():
             for i in range(1, len(left)):
-                prefix, suffix = left[:i], left[i:]
-                prefix_to_rules[prefix].append((suffix, right))
-                suffix_to_rules[suffix].append((prefix, right))
-        # Look for critical pairs: comapare (ab)c to a(bc).
-        for middle in prefix_to_rules.keys() & suffix_to_rules.keys():
-            prefix_rules = prefix_to_rules[middle]
-            suffix_rules = suffix_to_rules[middle]
-            for suffix_rule_prefix, suffix_rule_right in suffix_rules:
-                for prefix_rule_suffix, prefix_rule_right in prefix_rules:
-                    result1 = self.reduce(suffix_rule_right + prefix_rule_suffix)
-                    result2 = self.reduce(suffix_rule_prefix + prefix_rule_right)
-                    if result1 != result2:
-                        raise ValueError(f"Critical pair {(suffix_rule_prefix, middle, prefix_rule_suffix)} did not resolve")
+                pre, suf = left[:i], left[i:]
+                pre_suf_to_right[pre][suf] = right
+                suf_pre_to_right[suf][pre] = right
+        # Look for critical pairs: compare (ab)c to a(bc).
+        for b in pre_suf_to_right.keys() & suf_pre_to_right.keys():
+            for c, bc in pre_suf_to_right[b].items():
+                for a, ab in suf_pre_to_right[b].items():
+                    if self.reduce(ab + c) != self.reduce(a + bc):
+                        raise ValueError(f"Critical pair {(a, b, c)} did not resolve")
 
-        self.essentials = [((),),
-                           tuple([(a,) for a in alphabet])]
-
-        stack = list(alphabet)
-        successor_words = {}
+        stack = list(map(self.intern, alphabet))
+        successor_words = {None: list(stack)}
         while stack:
             word = stack.pop()
             if word in successor_words:
                 continue
             result = []
             for i in range(len(word)):
-                suffix = word[i:]
-                for left_suffix, right in prefix_to_rules.get(suffix, ()):
-                    if self.irreducible((word + left_suffix)[:-1]):
-                        # word + left_suffix reduces to right,
+                for suf, right in pre_suf_to_right[word[i:]].items():
+                    if self.irreducible((word + suf)[:-1]):
+                        # word + suf reduces to right,
                         # but no proper prefix reduces.
-                        result.append(left_suffix)
+                        result.append(self.intern(suf))
             successor_words[word] = tuple(result)
             stack.extend(result)
 
-        self.successor_words = successor_words
-        self.operation_cache = {}
-        self.classify_pair_cache = {}
-        self.essential_representation_cache = {}
-        self.coboundary_matrix_cache = {}
-        self.cohomology_cache = {}
+        self._operation_cache = defaultdict(dict)
+        self._successor_words = successor_words
+        self._classify_pair_cache = {}
+        self._essentials = [(Cell.make_root(self),)]
+        self._coboundary_matrix_cache = {}
+        self._cohomology_cache = {}
 
     def compute_essentials(self, maxdim):
-        while len(self.essentials) <= maxdim:
+        while len(self._essentials) <= maxdim:
             ess = []
-            starts = self.essentials[-1]
-            for start in starts:
-                for word in self.successor_words[start[-1]]:
-                    ess.append(start + (word,))
-            self.essentials.append(tuple(ess))
+            for x in self._essentials[-1]:
+                ess.extend(x.get_essential_extensions())
+            self._essentials.append(tuple(ess))
 
-    def essential_counts(self, maxdim=0):
+    def essential_tuples(self, maxdim):
+        self.compute_essentials(maxdim)
+        to_tuple = {self._essentials[0][0]: ()}
+        for ess_list in self._essentials[1:maxdim+1]:
+            for ess in ess_list:
+                to_tuple[ess] = to_tuple[ess.all_but_last] + (ess.last,)
+        return [list(map(to_tuple.get, ess_list))
+                for ess_list in self._essentials[:maxdim+1]]
+
+    def essential_counts(self, maxdim):
+        assert maxdim >= 1
         counts = [1, len(self.alphabet)]
         last_counts = Counter(self.alphabet)
         while len(counts) <= maxdim:
             next_last_counts = Counter()
             for last, count in last_counts.items():
-                for word in self.successor_words[last]:
+                for word in self._successor_words[last]:
                     next_last_counts[word] += count
             counts.append(next_last_counts.total())
             last_counts = next_last_counts
@@ -197,112 +203,79 @@ class CompleteRewritingSystem:
             return (COLLAPSIBLE, None)
         for j in range(1, len(b)):
             if self.reducible(a + b[:j]):
-                return (REDUNDANT, j)
+                return (REDUNDANT, (self.intern(b[:j]),
+                                    self.intern(b[j:])))
         return (ESSENTIAL, None)
 
     def classify_pair(self, a, b):
-        if (cached := self.classify_pair_cache.get((a, b))) is not None:
+        if (cached := self._classify_pair_cache.get((a, b))) is not None:
             return cached
         result = self._classify_pair_internal(a, b)
-        self.classify_pair_cache[a, b] = result
+        self._classify_pair_cache[a, b] = result
         return result
 
-    def classify_cell(self, cell):
-        if len(cell) == 0:
-            return (ESSENTIAL, None)
-        if "" in cell:
-            return (DEGENERATE, None)
-        if len(cell[0]) > 1:
-            collapsible = (cell[0][0], cell[0][1:]) + cell[1:]
-            return (REDUNDANT, (collapsible, 1))
-        for i in range(1, len(cell)):
-            a, b = cell[i-1], cell[i]
-            kind, index = self.classify_pair(a, b)
-            if kind == ESSENTIAL:
-                continue
-            elif kind == COLLAPSIBLE:
-                redundant = cell[:i-1] + (a + b,) + cell[i+1:]
-                return (COLLAPSIBLE, (redundant, i))
-            else:
-                assert kind == REDUNDANT
-                collapsible = cell[:i] + (b[:index], b[index:]) + cell[i+1:]
-                return (REDUNDANT, (collapsible, i+1))
-        return (ESSENTIAL, None)
+    def boundary_dicts(self, dim):
+        if dim == 0:
+            return [{}]
+        self.compute_essentials(dim)
 
-    def get_faces(self, cell):
-        for i in range(len(cell) + 1):
-            if i == 0:
-                face = cell[1:]
-            elif i == len(cell):
-                face = cell[:-1]
-            else:
-                x = self.operation(cell[i-1], cell[i])
-                face = cell[:i-1] + (x,) + cell[i+1:]
-            yield i, face
+        # Calculate essential representations of all faces
+        # of all essential cells
+        stack = [
+            face
+            for cell in self._essentials[dim]
+            for face in cell.get_faces()
+            if face.kind is REDUNDANT
+        ]
+        while stack:
+            cell = stack.pop()
+            if cell._inessrep:
+                cell._update_essrep()
+                if cell._inessrep:
+                    stack.append(cell)
+                    stack.extend(cell._inessrep.keys())
 
-    def _essential_representation_internal(self, cell):
-        kind, data = self.classify_cell(cell)
-        if kind == ESSENTIAL:
-            return {cell: 1}
-        elif kind == COLLAPSIBLE:
-            return {}
-        elif kind == DEGENERATE:
-            return {}
-        assert kind == REDUNDANT
-        collapsible, index = data
-        result = defaultdict(int)
-        for i, face in self.get_faces(collapsible):
-            if i == index:
-                continue
-            sign = (-1)**(i +index + 1)
-            for rep, count in self.essential_representation(face).items():
-                result[rep] += sign*count
+        result = []
+        for cell in self._essentials[dim]:
+            d = defaultdict(int)
+            for i, face in enumerate(cell._faces):
+                sign = (-1)**i
+                if face.kind is ESSENTIAL:
+                    d[face] += sign
+                elif face.kind is REDUNDANT:
+                    for rep, qty in face._essrep.items():
+                        d[rep] += sign*qty
+            result.append(dict(d))
         return result
-
-    def essential_representation(self, cell):
-        if (cached := self.essential_representation_cache.get(cell)) is not None:
-            return cached
-        result = self._essential_representation_internal(cell)
-        self.essential_representation_cache[cell] = result
-        return result
-
-    def essential_boundary(self, cell):
-        assert self.classify_cell(cell) == (ESSENTIAL, None)
-        result = defaultdict(int)
-        for i, face in self.get_faces(cell):
-            sign = (-1)**i
-            for rep, count in self.essential_representation(face).items():
-                result[rep] += sign*count
-        return dict(result)
 
     def boundary_vectors(self, dim):
         if dim == 0:
-            return []
+            return [Vector([])]
         self.compute_essentials(dim)
-        lower_essentials = self.essentials[dim - 1]
+        lower_essentials = self._essentials[dim - 1]
         N = len(lower_essentials)
         cell_to_index = {cell: i for i, cell in enumerate(lower_essentials)}
         result = []
-        for cell in self.essentials[dim]:
+        for d in self.boundary_dicts(dim):
             v = Vector.zero(N)
-            for rep, count in self.essential_boundary(cell).items():
-                v[cell_to_index[rep]] = count
+            for rep, qty in d.items():
+                v[cell_to_index[rep]] = qty
             result.append(v)
         return result
 
     def coboundary_matrix(self, dim):
         if dim == -1:
             return []
-        if dim not in self.coboundary_matrix_cache:
+        if dim not in self._coboundary_matrix_cache:
             boundary = self.boundary_vectors(dim + 1)
-            N = len(self.essentials[dim])
-            self.coboundary_matrix_cache[dim] = transpose(N, boundary)
-        return self.coboundary_matrix_cache[dim]
+            N = len(self._essentials[dim])
+            self._coboundary_matrix_cache[dim] = transpose(N, boundary)
+        return self._coboundary_matrix_cache[dim]
 
     def boundary_nonzero_invariants(self, dim):
         if dim == 0:
             return []
-        N = len(self.essentials[dim - 1])
+        N = len(self._essentials[dim - 1])
         boundary_vectors = self.boundary_vectors(dim)
         L = Lattice(N, boundary_vectors, maxrank=len(boundary_vectors))
         return L.nonzero_invariants()
@@ -314,7 +287,7 @@ class CompleteRewritingSystem:
         for dim in range(maxdim + 1):
             outgoing = invariants[dim]
             incoming = invariants[dim + 1]
-            free_rank = len(self.essentials[dim]) - len(outgoing) - len(incoming)
+            free_rank = len(self._essentials[dim]) - len(outgoing) - len(incoming)
             torsion = dict(Counter(incoming))
             torsion.pop(1, None)
             if free_rank:
@@ -329,7 +302,7 @@ class CompleteRewritingSystem:
         for dim in range(maxdim + 1):
             outgoing = invariants[dim]
             incoming = invariants[dim + 1]
-            free_rank = len(self.essentials[dim]) - len(outgoing) - len(incoming)
+            free_rank = len(self._essentials[dim]) - len(outgoing) - len(incoming)
             torsion = dict(Counter(outgoing))
             torsion.pop(1, None)
             if free_rank:
@@ -339,17 +312,175 @@ class CompleteRewritingSystem:
         return result
 
     def cohomology_with_generators(self, dim):
-        if dim not in self.cohomology_cache:
+        if dim not in self._cohomology_cache:
             incoming = self.coboundary_matrix(dim - 1)
             outgoing = self.coboundary_matrix(dim)
             h = homology(incoming, outgoing)
             generators = h.get_generators()
             invariants = h.get_invariants()
-            ess_dim = self.essentials[dim]
-            bar_gens = [{ess_dim[i] : gen[i]
+            ess_dim = self._essentials[dim]
+            bar_gens = [{ess_dim[i].to_tuple() : gen[i]
                          for i in filter(gen.__getitem__, range(len(ess_dim)))}
                         for gen in generators]
-            self.cohomology_cache[dim] = invariants, bar_gens
-        return self.cohomology_cache[dim]
+            self._cohomology_cache[dim] = invariants, bar_gens
+        return self._cohomology_cache[dim]
+
+    def essential_representation(self, tup):
+        [cell] = self._essentials[0]
+        for x in tup:
+            cell = cell.get_extension(x)
+        if cell.kind is ESSENTIAL:
+            return {tup: 1}
+        elif cell.kind is REDUNDANT:
+            while cell._inessrep:
+                cell._update_essrep()
+            return {rep.to_tuple(): qty for rep, qty in cell._essrep.items()}
+        else:
+            return {}
 
 CRS = CompleteRewritingSystem
+
+# Idea: don't represent the COLLAPSIBLE and DEGENERATE cells at all.
+# We could even have two classes, on for ESSENTIAL and one for REDUNDANT.
+
+class Cell:
+    __slots__ = [
+        "crs",
+        "kind", # CellKind
+        "all_but_last", # Cell | None
+        "last", # str | None
+        "_extensions", # dict[str, Cell]
+        "_essential_extensions", # tuple[Cell]
+        "_faces", # tuple[Cell] | None
+        "paired_coface", # None | Cell
+        "_inessrep", # dict[Cell, int]
+        "_essrep", # dict[Cell, int]
+    ]
+
+    def to_tuple(self):
+        parts = []
+        while self.last is not None:
+            parts.append(self.last)
+            self = self.all_but_last
+        parts.reverse()
+        return tuple(parts)
+
+    def __str__(self):
+        return "|".join(reversed(self.to_tuple())).join("[]")
+
+    def __repr__(self):
+        return f"Cell({self.kind}, ..., {self.last})"
+
+    @classmethod
+    def make_root(cls, crs):
+        root = cls()
+        root.crs = crs
+        root.kind = ESSENTIAL
+        root.all_but_last = root.last = None
+        root._extensions = {}
+        root.paired_coface = None
+        root._essential_extensions = None
+        root._faces = ()
+        root._inessrep = None
+        root._essrep = None
+        return root
+
+    def make_child(self, last, kind, paired_coface=None):
+        child = __class__()
+        child.all_but_last = self
+        child.last = last
+        child.kind = kind
+        child.paired_coface = paired_coface
+        child.crs = self.crs
+        child._extensions = {}
+        child._faces = (self, self) if self.last is None else None
+        child._essential_extensions = None
+        self._extensions[last] = child
+        if kind is REDUNDANT:
+            essrep = defaultdict(int)
+            inessrep = defaultdict(int)
+            faces = paired_coface.get_faces()
+            i = faces.index(child)
+            for j, face in enumerate(faces):
+                if i == j:
+                    continue
+                sign = (-1)**(i+j+1)
+                if face.kind is ESSENTIAL:
+                    essrep[face] += sign
+                elif face.kind is REDUNDANT:
+                    inessrep[face] += sign
+            child._inessrep = inessrep
+            child._essrep = essrep
+        else:
+            child._inessrep = None
+            child._essrep = None
+        return child
+
+    def get_extension(self, nxt):
+        extensions = self._extensions
+        if (cached := extensions.get(nxt)) is not None:
+            return cached
+        mykind = self.kind
+        paired_coface = None
+        if self.last is None:
+            assert mykind is ESSENTIAL
+            if not nxt:
+                kind = DEGENERATE
+            elif len(nxt) == 1:
+                kind = ESSENTIAL
+            else:
+                kind = REDUNDANT
+                head = self.crs.intern(nxt[0])
+                tail = self.crs.intern(nxt[1:])
+                paired_coface = self.get_extension(head).get_extension(tail)
+        else:
+            kind = mykind
+            if mykind is ESSENTIAL:
+                kind, splitting = self.crs.classify_pair(self.last, nxt)
+                if kind is REDUNDANT:
+                    pre, suf = splitting
+                    paired_coface = self.get_extension(pre).get_extension(suf)
+            elif mykind is REDUNDANT:
+                paired_coface = self.paired_coface.get_extension(nxt)
+        new_cell = self.make_child(nxt, kind, paired_coface)
+        return new_cell
+
+    def get_essential_extensions(self):
+        if (_ess := self._essential_extensions) is not None:
+            return _ess
+        if self.kind is not ESSENTIAL:
+            raise ValueError
+        succ = self.crs._successor_words[self.last]
+        _ess = [self.get_extension(nxt) for nxt in succ]
+        self._essential_extensions = _ess
+        return _ess
+
+    def get_faces(self):
+        if self._faces is not None:
+            return self._faces
+        last = self.last
+        abl = self.all_but_last
+        faces = [f.get_extension(last) for f in abl.get_faces()[:-1]]
+        faces.append(
+            abl.all_but_last.get_extension(
+                self.crs.operation(abl.last, last)
+            )
+        )
+        faces.append(abl)
+        # faces = tuple(faces)
+        self._faces = faces
+        return faces
+
+    def _update_essrep(self):
+        essrep = self._essrep
+        old_inessrep = self._inessrep
+        # Just asserting we're not re-entrant
+        self._essrep = self._inessrep = object()
+        inessrep = defaultdict(int)
+        for rep, rep_qty in old_inessrep.items():
+            for reprep, reprep_qty in rep._essrep.items():
+                essrep[reprep] += rep_qty * reprep_qty
+            for reprep, reprep_qty in rep._inessrep.items():
+                inessrep[reprep] += rep_qty * reprep_qty
+        self._essrep = essrep
+        self._inessrep = inessrep

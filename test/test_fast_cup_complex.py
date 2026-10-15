@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.parametrize("n", [2,3,4])
 def test_cyclic(n):
-    c = Cup(CRS("x", [("x"*n, "")]))
+    c = Cup(CRS("x", {"x"*n: ""}))
     assert c.op == [[(i+j)%n for j in range(n)] for i in range(n)]
     assert c.cohomology_list(10) == [[0],[],[n],[],[n],[],[n],[],[n],[],[n]]
     for a in range(10):
@@ -19,7 +19,7 @@ def test_cyclic(n):
                 assert matrix == [[[1]]]
 
 def test_V4():
-    c = Cup(CRS("xy", [("yx", "xy"), ("xx", ""), ("yy", "")]))
+    c = Cup(CRS("xy", {"yx":"xy", "xx":"", "yy":""}))
     assert c.op == [[i ^ j for j in range(4)] for i in range(4)]
     assert c.cohomology_list(6) == [[0],[],[2,2],[2],[2,2,2],[2,2],[2,2,2,2]]
     [[aa, ab], [ba, bb]] = c.cup_product_matrix(2, 2)
@@ -31,9 +31,9 @@ def test_V4():
 
 def test_rect22_rect22():
     # Product of (2x2 rectangular band + 1) with itself
-    c = Cup(CRS("abxy", [("aa","a"),("bb","b"),("aba","a"),("bab","b"),
-                         ("xx","x"),("yy","y"),("xyx","x"),("yxy","y"),
-                         ("xa","ax"),("xb","bx"),("ya","ay"),("yb","by")]))
+    c = Cup(CRS("abxy", {"aa":"a", "bb":"b", "aba":"a", "bab":"b",
+                         "xx":"x", "yy":"y", "xyx":"x", "yxy":"y",
+                         "xa":"ax", "xb":"bx", "ya":"ay", "yb":"by"}))
     assert len(c.op) == 25
     assert c.cohomology_list(10) == [[0],[],[0,0],[],[0],[],[],[],[],[],[]]
     assert c.cup_product_matrix(0, 0) == [[[1]]]

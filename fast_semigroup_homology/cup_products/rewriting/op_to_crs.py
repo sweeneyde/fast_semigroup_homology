@@ -55,7 +55,7 @@ def crs_from_representation(op, gens, rep):
     ]
     relations.sort()
     alphabet, relations = kb_normalize(alphabet, relations)
-    crs = CRS(alphabet, relations)
+    crs = CRS(alphabet, dict(relations))
     return elements, crs
 
 def generate_crs_alternatives_with_generators(op, gens, perms_per_combo):

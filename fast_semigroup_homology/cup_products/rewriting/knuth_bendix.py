@@ -26,7 +26,7 @@ while we could also have used a different rule to produce xx,
 which is likewise irreducible; order mattered.
 """
 
-__all__ = ["normalize"]
+__all__ = ["kb_normalize"]
 
 from collections import defaultdict, deque
 

@@ -220,13 +220,25 @@ class CompleteRewritingSystem:
             for face in cell.get_faces(self)
             if type(face) is RedundantCell
         ]
+        # Marker to note when all of _inessrep has been processed.
+        ALL_READY = object()
         while stack:
             peek = stack[-1]
-            peek._represent_inessrep()
-            if peek._inessrep:
+            if peek is not ALL_READY:
+                stack.append(ALL_READY)
                 stack.extend(peek._inessrep)
-            else:
-                stack.pop()
+                continue
+            stack.pop() # ALL_READY
+            ready = stack.pop()
+            # Because the ready cell is marked ready,
+            # we know that all of its _inessrep cells
+            # have fully finished _essrep.
+            essrep = ready._essrep
+            for rep, q in ready._inessrep.items():
+                if q:
+                    for reprep, qq in rep._essrep.items():
+                        essrep[reprep] += q*qq
+            ready._inessrep.clear()
 
         result = []
         for cell in self._essentials[dim]:
@@ -445,7 +457,7 @@ class EssentialCell(_CellBase):
             _faces = (self, self)
             head = crs.intern(nxt[0])
             tail = crs.intern(nxt[1:])
-            assert tail
+            assert tail, "the essential 1-cells should already be cached"
             child = RedundantCell()
             child.paired_coface = self._extensions[head].get_extension(tail, crs)
         else:
@@ -523,25 +535,17 @@ class RedundantCell(_CellBase):
             elif type(neg) is RedundantCell:
                 inessrep[neg] -= 1
 
-    def _represent_inessrep(self):
-        if not self._inessrep:
-            return
-        old_inessrep = self._inessrep
-        inessrep = self._inessrep = defaultdict(int)
-        essrep = self._essrep
-        for rep, q in old_inessrep.items():
-            if not q:
-                continue
-            for reprep, qq in rep._essrep.items():
-                essrep[reprep] += q*qq
-            for reprep, qq in rep._inessrep.items():
-                inessrep[reprep] += q*qq
-
     def essential_representation(self, reduce=False):
-        if reduce:
-            while self._inessrep:
-                self._represent_inessrep()
-        else:
-            if self._inessrep:
-                raise ValueError("still needs reducing")
+        if not reduce and self._inessrep:
+            raise ValueError("still needs reducing")
+        essrep = self._essrep
+        while (old_inessrep := self._inessrep):
+            inessrep = self._inessrep = defaultdict(int)
+            for rep, q in old_inessrep.items():
+                if not q:
+                    continue
+                for reprep, qq in rep._essrep.items():
+                    essrep[reprep] += q*qq
+                for reprep, qq in rep._inessrep.items():
+                    inessrep[reprep] += q*qq
         return dict(self._essrep)

@@ -18,14 +18,6 @@ from mutable_lattice import Vector, Lattice, transpose
 
 from ..homology_with_generators import homology
 
-class CellKind(Enum):
-    DEGENERATE = 0
-    ESSENTIAL = 1
-    REDUNDANT = 2
-    COLLAPSIBLE = 3
-
-DEGENERATE, ESSENTIAL, REDUNDANT, COLLAPSIBLE = CellKind
-
 class CompleteRewritingSystem:
     __slots__ = [
         "alphabet",
@@ -140,7 +132,9 @@ class CompleteRewritingSystem:
         self._operation_cache = defaultdict(dict)
         self._successor_words = successor_words
         self._classify_pair_cache = {}
-        self._essentials = [(Cell.make_root(self),)]
+        root = EssentialCell.make_root()
+        self._essentials = [(root,),
+                            tuple(map(root.make_essential_1cell, self.alphabet))]
         self._coboundary_matrix_cache = {}
         self._cohomology_cache = {}
 
@@ -148,7 +142,7 @@ class CompleteRewritingSystem:
         while len(self._essentials) <= maxdim:
             ess = []
             for x in self._essentials[-1]:
-                ess.extend(x.get_essential_extensions())
+                ess.extend(x.make_essential_extensions(self))
             self._essentials.append(tuple(ess))
 
     def essential_tuples(self, maxdim):
@@ -200,12 +194,12 @@ class CompleteRewritingSystem:
         # REDUNDANT cells have an adjacent pair concatenate to have a reducible proper prefix.
         # ESSENTIAL cells have none of these.
         if self.irreducible(a + b):
-            return (COLLAPSIBLE, None)
+            return (CollapsibleCell, None)
         for j in range(1, len(b)):
             if self.reducible(a + b[:j]):
-                return (REDUNDANT, (self.intern(b[:j]),
-                                    self.intern(b[j:])))
-        return (ESSENTIAL, None)
+                return (RedundantCell, (self.intern(b[:j]),
+                                        self.intern(b[j:])))
+        return (EssentialCell, None)
 
     def classify_pair(self, a, b):
         if (cached := self._classify_pair_cache.get((a, b))) is not None:
@@ -218,33 +212,43 @@ class CompleteRewritingSystem:
         if dim == 0:
             return [{}]
         self.compute_essentials(dim)
-
         # Calculate essential representations of all faces
         # of all essential cells
         stack = [
             face
             for cell in self._essentials[dim]
-            for face in cell.get_faces()
-            if face.kind is REDUNDANT
+            for face in cell.get_faces(self)
+            if type(face) is RedundantCell
         ]
         while stack:
-            cell = stack.pop()
-            if cell._inessrep:
-                cell._update_essrep()
-                if cell._inessrep:
-                    stack.append(cell)
-                    stack.extend(cell._inessrep.keys())
+            peek = stack[-1]
+            peek._represent_inessrep()
+            if peek._inessrep:
+                stack.extend(peek._inessrep)
+            else:
+                stack.pop()
 
         result = []
         for cell in self._essentials[dim]:
             d = defaultdict(int)
-            for i, face in enumerate(cell._faces):
-                sign = (-1)**i
-                if face.kind is ESSENTIAL:
-                    d[face] += sign
-                elif face.kind is REDUNDANT:
-                    for rep, qty in face._essrep.items():
-                        d[rep] += sign*qty
+            for face in cell._faces[0::2]:
+                # even index --> don't negate
+                if type(face) is EssentialCell:
+                    d[face] += 1
+                elif type(face) is RedundantCell:
+                    assert not face._inessrep
+                    for rep, q in face._essrep.items():
+                        d[rep] += q
+            for face in cell._faces[1::2]:
+                # odd index --> do negate
+                if type(face) is EssentialCell:
+                    d[face] -= 1
+                elif type(face) is RedundantCell:
+                    assert not face._inessrep
+                    for rep, q in face._essrep.items():
+                        d[rep] -= q
+            for k in [k for k, v in d.items() if not v]:
+                del d[k]
             result.append(dict(d))
         return result
 
@@ -328,13 +332,15 @@ class CompleteRewritingSystem:
     def essential_representation(self, tup):
         [cell] = self._essentials[0]
         for x in tup:
-            cell = cell.get_extension(x)
-        if cell.kind is ESSENTIAL:
+            cell = cell.get_extension(x, self)
+            if cell is None:
+                return {}
+        tp = type(cell)
+        if tp is EssentialCell:
             return {tup: 1}
-        elif cell.kind is REDUNDANT:
-            while cell._inessrep:
-                cell._update_essrep()
-            return {rep.to_tuple(): qty for rep, qty in cell._essrep.items()}
+        elif tp is RedundantCell:
+            essrep = cell.essential_representation(reduce=True)
+            return {rep.to_tuple(): qty for rep, qty in essrep.items()}
         else:
             return {}
 
@@ -343,144 +349,199 @@ CRS = CompleteRewritingSystem
 # Idea: don't represent the COLLAPSIBLE and DEGENERATE cells at all.
 # We could even have two classes, on for ESSENTIAL and one for REDUNDANT.
 
-class Cell:
+extension_cache_hits = Counter()
+extension_cache_misses = Counter()
+face_cache_hits = Counter()
+face_cache_misses = Counter()
+
+class _CellBase:
     __slots__ = [
-        "crs",
-        "kind", # CellKind
         "all_but_last", # Cell | None
         "last", # str | None
         "_extensions", # dict[str, Cell]
-        "_essential_extensions", # tuple[Cell]
-        "_faces", # tuple[Cell] | None
-        "paired_coface", # None | Cell
-        "_inessrep", # dict[Cell, int]
-        "_essrep", # dict[Cell, int]
+        "_faces", # None | tuple[Cell]
     ]
 
     def to_tuple(self):
         parts = []
-        while self.last is not None:
-            parts.append(self.last)
+        while (x := self.last) is not None:
+            parts.append(x)
             self = self.all_but_last
         parts.reverse()
         return tuple(parts)
 
     def __str__(self):
-        return "|".join(reversed(self.to_tuple())).join("[]")
+        return "|".join(self.to_tuple()).join("[]")
 
     def __repr__(self):
-        return f"Cell({self.kind}, ..., {self.last})"
+        return f"{type(self).__name__}('{self!s}')"
 
-    @classmethod
-    def make_root(cls, crs):
-        root = cls()
-        root.crs = crs
-        root.kind = ESSENTIAL
-        root.all_but_last = root.last = None
-        root._extensions = {}
-        root.paired_coface = None
-        root._essential_extensions = None
-        root._faces = ()
-        root._inessrep = None
-        root._essrep = None
-        return root
-
-    def make_child(self, last, kind, paired_coface=None):
-        child = __class__()
-        child.all_but_last = self
-        child.last = last
-        child.kind = kind
-        child.paired_coface = paired_coface
-        child.crs = self.crs
-        child._extensions = {}
-        child._faces = (self, self) if self.last is None else None
-        child._essential_extensions = None
-        self._extensions[last] = child
-        if kind is REDUNDANT:
-            essrep = defaultdict(int)
-            inessrep = defaultdict(int)
-            faces = paired_coface.get_faces()
-            i = faces.index(child)
-            for j, face in enumerate(faces):
-                if i == j:
-                    continue
-                sign = (-1)**(i+j+1)
-                if face.kind is ESSENTIAL:
-                    essrep[face] += sign
-                elif face.kind is REDUNDANT:
-                    inessrep[face] += sign
-            child._inessrep = inessrep
-            child._essrep = essrep
-        else:
-            child._inessrep = None
-            child._essrep = None
-        return child
-
-    def get_extension(self, nxt):
-        extensions = self._extensions
-        if (cached := extensions.get(nxt)) is not None:
-            return cached
-        mykind = self.kind
-        paired_coface = None
-        if self.last is None:
-            assert mykind is ESSENTIAL
-            if not nxt:
-                kind = DEGENERATE
-            elif len(nxt) == 1:
-                kind = ESSENTIAL
-            else:
-                kind = REDUNDANT
-                head = self.crs.intern(nxt[0])
-                tail = self.crs.intern(nxt[1:])
-                paired_coface = self.get_extension(head).get_extension(tail)
-        else:
-            kind = mykind
-            if mykind is ESSENTIAL:
-                kind, splitting = self.crs.classify_pair(self.last, nxt)
-                if kind is REDUNDANT:
-                    pre, suf = splitting
-                    paired_coface = self.get_extension(pre).get_extension(suf)
-            elif mykind is REDUNDANT:
-                paired_coface = self.paired_coface.get_extension(nxt)
-        new_cell = self.make_child(nxt, kind, paired_coface)
-        return new_cell
-
-    def get_essential_extensions(self):
-        if (_ess := self._essential_extensions) is not None:
-            return _ess
-        if self.kind is not ESSENTIAL:
-            raise ValueError
-        succ = self.crs._successor_words[self.last]
-        _ess = [self.get_extension(nxt) for nxt in succ]
-        self._essential_extensions = _ess
-        return _ess
-
-    def get_faces(self):
+    def get_faces(self, crs):
         if self._faces is not None:
             return self._faces
         last = self.last
         abl = self.all_but_last
-        faces = [f.get_extension(last) for f in abl.get_faces()[:-1]]
-        faces.append(
+        faces = (
+            *[None if f is None else f.get_extension(last, crs)
+              for f in abl.get_faces(crs)[:-1]],
             abl.all_but_last.get_extension(
-                self.crs.operation(abl.last, last)
-            )
+                crs.operation(abl.last, last), crs
+            ),
+            abl,
         )
-        faces.append(abl)
-        # faces = tuple(faces)
         self._faces = faces
         return faces
 
-    def _update_essrep(self):
-        essrep = self._essrep
+class EssentialCell(_CellBase):
+    __slots__ = ()
+
+    @staticmethod
+    def make_root():
+        root = EssentialCell()
+        root.all_but_last = root.last = None
+        root._extensions = {}
+        root._faces = ()
+        return root
+
+    def make_essential_1cell(self, nxt):
+        assert self.last is None
+        child = EssentialCell()
+        child.all_but_last = self
+        child.last = nxt
+        child._extensions = {}
+        child._faces = (self, self)
+        self._extensions[nxt] = child
+        return child
+
+    def make_essential_extension(self, nxt):
+        child = EssentialCell()
+        child.all_but_last = self
+        child.last = nxt
+        child._extensions = {}
+        child._faces = None
+        self._extensions[nxt] = child
+        return child
+
+    def make_essential_extensions(self, crs):
+        return map(self.make_essential_extension,
+                   crs._successor_words[self.last])
+
+    def get_essential_extension(self, nxt):
+        extensions = self._extensions
+        if (cached := extensions.get(nxt)) is not None:
+            return cached
+        result = self.make_essential_extension(nxt)
+        extensions[nxt] = result
+        return result
+
+    def get_extension(self, nxt, crs):
+        extensions = self._extensions
+        if (cached := extensions.get(nxt)) is not None:
+            return cached
+        if not nxt:
+            return None
+        _faces = None
+        if self.last is None:
+            _faces = (self, self)
+            head = crs.intern(nxt[0])
+            tail = crs.intern(nxt[1:])
+            assert tail
+            child = RedundantCell()
+            child.paired_coface = self._extensions[head].get_extension(tail, crs)
+        else:
+            tp, splitting = crs.classify_pair(self.last, nxt)
+            if tp is RedundantCell:
+                pre, suf = splitting
+                child = RedundantCell()
+                child.paired_coface = self.get_essential_extension(pre).get_extension(suf, crs)
+            else:
+                child = tp()
+        child.all_but_last = self
+        child.last = nxt
+        child._extensions = {}
+        child._faces = _faces
+        extensions[nxt] = child
+        if type(child) is RedundantCell:
+            child._set_inessrep_and_essrep(crs)
+        return child
+
+class CollapsibleCell(_CellBase):
+    __slots__ = ()
+    def get_extension(self, nxt, _):
+        extensions = self._extensions
+        if (cached := extensions.get(nxt)) is not None:
+            return cached
+        if not nxt:
+            return None
+        child = CollapsibleCell()
+        child.all_but_last = self
+        child.last = nxt
+        child._extensions = {}
+        child._faces = None
+        extensions[nxt] = child
+        return child
+
+class RedundantCell(_CellBase):
+    __slots__ = [
+        "_essrep",
+        "_inessrep",
+        "paired_coface", # Cell
+    ]
+
+    def get_extension(self, nxt, crs):
+        extensions = self._extensions
+        if (cached := extensions.get(nxt)) is not None:
+            return cached
+        if not nxt:
+            return None
+        child = RedundantCell()
+        child.all_but_last = self
+        child.last = nxt
+        child._extensions = {}
+        child._faces = None
+        child.paired_coface = self.paired_coface.get_extension(nxt, crs)
+        extensions[nxt] = child
+        child._set_inessrep_and_essrep(crs)
+        return child
+
+    def _set_inessrep_and_essrep(self, crs):
+        faces = self.paired_coface.get_faces(crs)
+        i = faces.index(self)
+        bit = i & 1
+        essrep = self._essrep = defaultdict(int)
+        inessrep = self._inessrep = defaultdict(int)
+        # Opposite parity face --> multiplicity 1
+        for pos in faces[1-bit::2]:
+            if type(pos) is EssentialCell:
+                essrep[pos] += 1
+            elif type(pos) is RedundantCell:
+                inessrep[pos] += 1        
+        # Same parity face --> multiplicty -1
+        for neg in faces[bit:i:2] + faces[i+2::2]:
+            if type(neg) is EssentialCell:
+                essrep[neg] -= 1
+            elif type(neg) is RedundantCell:
+                inessrep[neg] -= 1
+
+    def _represent_inessrep(self):
+        if not self._inessrep:
+            return
         old_inessrep = self._inessrep
-        # Just asserting we're not re-entrant
-        self._essrep = self._inessrep = object()
-        inessrep = defaultdict(int)
-        for rep, rep_qty in old_inessrep.items():
-            for reprep, reprep_qty in rep._essrep.items():
-                essrep[reprep] += rep_qty * reprep_qty
-            for reprep, reprep_qty in rep._inessrep.items():
-                inessrep[reprep] += rep_qty * reprep_qty
-        self._essrep = essrep
-        self._inessrep = inessrep
+        inessrep = self._inessrep = defaultdict(int)
+        essrep = self._essrep
+        for rep, q in old_inessrep.items():
+            if not q:
+                continue
+            for reprep, qq in rep._essrep.items():
+                essrep[reprep] += q*qq
+            for reprep, qq in rep._inessrep.items():
+                inessrep[reprep] += q*qq
+
+    def essential_representation(self, reduce=False):
+        if reduce:
+            while self._inessrep:
+                self._represent_inessrep()
+        else:
+            if self._inessrep:
+                raise ValueError("still needs reducing")
+        return dict(self._essrep)

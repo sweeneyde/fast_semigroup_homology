@@ -63,6 +63,18 @@ def test_C3():
     ]
     assert crs.essential_counts(4) == [1, 1, 1, 1, 1]
     assert crs.op_table(["", "x", "xx"]) == [[0, 1, 2], [1, 2, 0], [2, 0, 1]]
+    [[root], [x], [x_xx], [x_xx_x], [x_xx_x_xx]] = crs._essentials[:5]
+    assert root._extensions == {"x": x}
+    assert x._extensions == {"xx": x_xx}
+    assert x_xx._extensions == {"x": x_xx_x}
+    assert x_xx_x._extensions == {"xx": x_xx_x_xx}
+    assert x.last == x_xx_x.last == "x"
+    assert x_xx.last is x_xx_x_xx.last == "xx"
+    assert x.get_faces(crs) == (root, root)
+    xx = root.get_extension("xx", crs)
+    assert x_xx.get_faces(crs) == (xx, None, x)
+    assert xx._essrep == {x: 2}
+    assert xx._inessrep == {}
     assert crs.homology_list(5) == [{0: 1}, {3: 1}, {}, {3: 1}, {}, {3: 1}]
     assert crs.cohomology_list(5) == [{0: 1}, {}, {3: 1}, {}, {3: 1}, {}]
     assert crs.cohomology_with_generators(0) == ([0], [{(): 1}])
